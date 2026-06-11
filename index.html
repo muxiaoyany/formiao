@@ -1,22 +1,42 @@
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>致 你 — 星河万里</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>致 喵喵 — 星河万里</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;700&family=Ma+Shan+Zheng&family=Long+Cang&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{background:#000008;overflow:hidden;font-family:'Noto Serif SC',serif;cursor:none;height:100vh;width:100vw;-webkit-tap-highlight-color:transparent}
-canvas{display:block;position:fixed;top:0;left:0}
+html,body{position:fixed;overflow:hidden;width:100%;height:100%;touch-action:none;-webkit-overflow-scrolling:none;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+body{background:#000008;font-family:'Noto Serif SC',serif;cursor:none;height:100vh;height:100dvh;width:100vw}
+canvas{display:block;position:fixed;top:0;left:0;width:100%;height:100%}
 #c3d{z-index:0}
 #c2d{z-index:1;pointer-events:none}
 #cui{z-index:2;pointer-events:none}
-.stage-hint{position:fixed;bottom:36px;left:50%;transform:translateX(-50%);z-index:5;pointer-events:none;color:rgba(255,240,210,0.45);font-size:0.82rem;letter-spacing:0.22em;transition:all 1s;font-family:'Noto Serif SC',serif}
-.stage-indicator{position:fixed;top:32px;right:36px;z-index:5;pointer-events:none;display:flex;gap:10px;flex-direction:column}
-.stage-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);transition:all 0.6s}
-.stage-dot.active{background:rgba(249,209,112,0.9);box-shadow:0 0 14px rgba(249,209,112,0.6)}
+
+.stage-hint{position:fixed;bottom:max(28px, env(safe-area-inset-bottom, 20px));left:50%;transform:translateX(-50%);z-index:5;pointer-events:none;color:rgba(255,240,210,0.5);font-size:0.8rem;letter-spacing:0.18em;transition:all 1s;font-family:'Noto Serif SC',serif;text-align:center;padding:0 16px;max-width:90vw;line-height:1.5;text-shadow:0 0 12px rgba(0,0,0,0.6)}
+
+.stage-indicator{position:fixed;top:max(20px, env(safe-area-inset-top, 16px));right:20px;z-index:5;pointer-events:none;display:flex;gap:12px;flex-direction:column}
+.stage-dot{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,0.15);transition:all 0.6s;border:1px solid rgba(255,255,255,0.08)}
+.stage-dot.active{background:rgba(249,209,112,0.95);box-shadow:0 0 18px rgba(249,209,112,0.7);border-color:rgba(249,209,112,0.3)}
+
+/* Swipe hint animation */
+.swipe-hint{position:fixed;bottom:50%;left:50%;transform:translate(-50%,50%);z-index:6;pointer-events:none;color:rgba(255,255,255,0.35);font-size:1.6rem;animation:swipePulse 2.5s ease-in-out infinite;transition:opacity 0.8s}
+.swipe-hint.fade{opacity:0}
+@keyframes swipePulse{0%,100%{opacity:0.15;transform:translate(-50%,50%) translateX(0)}40%{opacity:0.5;transform:translate(-50%,50%) translateX(-22px)}60%{opacity:0.5;transform:translate(-50%,50%) translateX(22px)}}
+
+/* Mobile: larger dots, repositioned */
+@media (max-width: 768px) {
+  .stage-indicator{top:max(14px, env(safe-area-inset-top, 12px));right:14px;gap:14px}
+  .stage-dot{width:12px;height:12px}
+  .stage-dot.active{box-shadow:0 0 22px rgba(249,209,112,0.8)}
+  .stage-hint{font-size:0.85rem;letter-spacing:0.14em;bottom:max(32px, env(safe-area-inset-bottom, 24px))}
+}
+@media (min-width: 1200px) {
+  .stage-dot{width:8px;height:8px}
+}
 </style>
 </head>
 <body>
@@ -29,6 +49,7 @@ canvas{display:block;position:fixed;top:0;left:0}
   <div class="stage-dot active"></div><div class="stage-dot"></div><div class="stage-dot"></div><div class="stage-dot"></div>
 </div>
 <div class="stage-hint" id="hint">🖱 移动探索 · 点击绽放 · 滚轮切换场景 · 空格许愿</div>
+<div class="swipe-hint" id="swipeHint">⟵ 滑动切换场景 ⟶</div>
 
 <script type="importmap">
 {"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
@@ -42,6 +63,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js';
 
 // ═══════════════════════════════════
+// MOBILE DETECTION
+// ═══════════════════════════════════
+const isMobile=/Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent)||
+  ('ontouchstart' in window && window.innerWidth<1024)||
+  (navigator.maxTouchPoints>0 && window.innerWidth<1024);
+
+// ═══════════════════════════════════
 // GLOBAL STATE
 // ═══════════════════════════════════
 const STATE={stage:0,targetStage:0,stageTransition:0,t:0,dt:0};
@@ -51,21 +79,29 @@ const raycaster=new THREE.Raycaster();
 let W,H;
 
 // ═══════════════════════════════════
-// THREE.JS SETUP
+// THREE.JS SETUP — mobile-tuned
 // ═══════════════════════════════════
 const canvas3d=document.getElementById('c3d');
-const renderer=new THREE.WebGLRenderer({canvas:canvas3d,antialias:true,alpha:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const renderer=new THREE.WebGLRenderer({canvas:canvas3d,antialias:!isMobile,alpha:true,powerPreference:isMobile?'high-performance':'default'});
+const pxRatio=isMobile?Math.min(devicePixelRatio,2):Math.min(devicePixelRatio,2);
+renderer.setPixelRatio(pxRatio);
 renderer.toneMapping=THREE.ReinhardToneMapping;
-renderer.toneMappingExposure=1.1;
+renderer.toneMappingExposure=isMobile?1.0:1.1;
 const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(55,2,0.1,300);
 camera.position.set(0,2,32);
 const composer=new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene,camera));
-const bloom=new UnrealBloomPass(new THREE.Vector2(2,2),0.65,0.35,0.15);
+const bloomStrength=isMobile?0.5:0.65;
+const bloom=new UnrealBloomPass(new THREE.Vector2(2,2),bloomStrength,0.35,0.15);
 composer.addPass(bloom);
-composer.addPass(new AfterimagePass(0.1));
+if(!isMobile)composer.addPass(new AfterimagePass(0.1));
+
+// ═══════════════════════════════════
+// PERFORMANCE SCALING
+// ═══════════════════════════════════
+const SCALE=isMobile?0.45:1;
+function scaledCount(n){return Math.max(Math.floor(n*SCALE),isMobile?Math.floor(n*0.3):n);}
 
 // ═══════════════════════════════════
 // GALAXY — 大螺旋星系
@@ -77,10 +113,11 @@ const armColors=[
   new THREE.Color('#ffe0f0'),new THREE.Color('#e0d0ff'),new THREE.Color('#d0e8ff'),
 ];
 
-for(let arm=0;arm<5;arm++){
-  const cnt=2000;const geo=new THREE.BufferGeometry();
+const armCount=isMobile?4:5;
+for(let arm=0;arm<armCount;arm++){
+  const cnt=scaledCount(2000);const geo=new THREE.BufferGeometry();
   const pos=new Float32Array(cnt*3),col=new Float32Array(cnt*3);
-  const baseAngle=(arm/5)*Math.PI*2;
+  const baseAngle=(arm/armCount)*Math.PI*2;
   const bc=armColors[arm];
   for(let i=0;i<cnt;i++){
     const t2=i/cnt, r=1.2+t2*22;
@@ -94,13 +131,14 @@ for(let arm=0;arm<5;arm++){
   }
   geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
   geo.setAttribute('color',new THREE.BufferAttribute(col,3));
-  const pts=new THREE.Points(geo,new THREE.PointsMaterial({size:0.09,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.7}));
+  const ptSize=isMobile?0.11:0.09;
+  const pts=new THREE.Points(geo,new THREE.PointsMaterial({size:ptSize,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.7}));
   galaxyGroup.add(pts);galaxyArms.push(pts);
 }
 
 // 星系核心亮团
 const coreGeo=new THREE.BufferGeometry();
-const coreCnt=600;const coreP=new Float32Array(coreCnt*3),coreC=new Float32Array(coreCnt*3);
+const coreCnt=scaledCount(600);const coreP=new Float32Array(coreCnt*3),coreC=new Float32Array(coreCnt*3);
 for(let i=0;i<coreCnt;i++){
   const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),r=Math.random()*3.5;
   coreP[i*3]=Math.sin(ph)*Math.cos(th)*r;coreP[i*3+1]=Math.sin(ph)*Math.sin(th)*r*0.4;coreP[i*3+2]=Math.cos(ph)*r;
@@ -108,18 +146,20 @@ for(let i=0;i<coreCnt;i++){
 }
 coreGeo.setAttribute('position',new THREE.BufferAttribute(coreP,3));
 coreGeo.setAttribute('color',new THREE.BufferAttribute(coreC,3));
-const coreGlow=new THREE.Points(coreGeo,new THREE.PointsMaterial({size:0.18,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.9}));
+const corePtSize=isMobile?0.22:0.18;
+const coreGlow=new THREE.Points(coreGeo,new THREE.PointsMaterial({size:corePtSize,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.9}));
 galaxyGroup.add(coreGlow);
 
 // ═══════════════════════════════════
 // NEBULA — 星云粒子团
 // ═══════════════════════════════════
 const nebulae=[];
-for(let n=0;n<4;n++){
+const nebCount=isMobile?3:4;
+for(let n=0;n<nebCount;n++){
   const grp=new THREE.Group();
-  const cnt=400;const geo=new THREE.BufferGeometry();
+  const cnt=scaledCount(400);const geo=new THREE.BufferGeometry();
   const pos=new Float32Array(cnt*3),col=new Float32Array(cnt*3);
-  const cx=(n-1.5)*10,cy=(Math.random()-0.5)*4,cz=-5+Math.random()*10;
+  const cx=(n-(nebCount-1)/2)*10,cy=(Math.random()-0.5)*4,cz=-5+Math.random()*10;
   const hue=[0.08,0.15,0.7,0.85][n];
   for(let i=0;i<cnt;i++){
     const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),r=Math.random()*4;
@@ -129,7 +169,8 @@ for(let n=0;n<4;n++){
   }
   geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
   geo.setAttribute('color',new THREE.BufferAttribute(col,3));
-  grp.add(new THREE.Points(geo,new THREE.PointsMaterial({size:0.25,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.35})));
+  const nebPtSize=isMobile?0.32:0.25;
+  grp.add(new THREE.Points(geo,new THREE.PointsMaterial({size:nebPtSize,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.35})));
   scene.add(grp);nebulae.push(grp);
 }
 
@@ -138,8 +179,9 @@ for(let n=0;n<4;n++){
 // ═══════════════════════════════════
 const heartGroup=new THREE.Group();scene.add(heartGroup);
 function heartEq(t,s=1){return{x:16*Math.sin(t)**3*s*0.08,y:(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))*s*0.08}}
-for(let L=0;L<7;L++){
-  const cnt=1500+L*250;const geo=new THREE.BufferGeometry();
+const heartLayers=isMobile?5:7;
+for(let L=0;L<heartLayers;L++){
+  const cnt=scaledCount(1500+L*250);const geo=new THREE.BufferGeometry();
   const pos=new Float32Array(cnt*3),col=new Float32Array(cnt*3);
   const bc=new THREE.Color().setHSL(0.95-L*0.04,0.9,0.55+L*0.07);
   const sc=1+L*0.22;
@@ -152,11 +194,13 @@ for(let L=0;L<7;L++){
   }
   geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
   geo.setAttribute('color',new THREE.BufferAttribute(col,3));
-  heartGroup.add(new THREE.Points(geo,new THREE.PointsMaterial({size:0.08,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.8-L*0.06})));
+  const hPtSize=isMobile?0.1:0.08;
+  heartGroup.add(new THREE.Points(geo,new THREE.PointsMaterial({size:hPtSize,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.8-L*0.06})));
 }
 // 心脏光环
-for(let r=0;r<4;r++){
-  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.6+r*0.4,0.012,32,200),new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(0.95-r*0.06,0.9,0.6+r*0.12),transparent:true,opacity:0.4-r*0.08,blending:THREE.AdditiveBlending,depthWrite:false}));
+const heartRings=isMobile?3:4;
+for(let r=0;r<heartRings;r++){
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.6+r*0.4,0.012,32,isMobile?120:200),new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(0.95-r*0.06,0.9,0.6+r*0.12),transparent:true,opacity:0.4-r*0.08,blending:THREE.AdditiveBlending,depthWrite:false}));
   ring.rotation.x=Math.PI/3+r*0.3;ring.rotation.y=r*0.6;heartGroup.add(ring);ring.userData={axis:r%2?'x':'y',speed:0.18+r*0.06,offset:r};
 }
 
@@ -165,12 +209,14 @@ for(let r=0;r<4;r++){
 // ═══════════════════════════════════
 const lanternGroup=new THREE.Group();scene.add(lanternGroup);
 const lanternParticles=[];
-for(let i=0;i<120;i++){
+const lanternCount=isMobile?60:120;
+for(let i=0;i<lanternCount;i++){
   const geo=new THREE.BufferGeometry();
   const p=new Float32Array([0,0,0]);
   geo.setAttribute('position',new THREE.BufferAttribute(p,3));
   const hue=0.08+Math.random()*0.1;
-  const pts=new THREE.Points(geo,new THREE.PointsMaterial({size:0.35+Math.random()*0.5,color:new THREE.Color().setHSL(hue,0.9,0.5+Math.random()*0.4),blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.7}));
+  const ltSize=isMobile?0.5+Math.random()*0.6:0.35+Math.random()*0.5;
+  const pts=new THREE.Points(geo,new THREE.PointsMaterial({size:ltSize,color:new THREE.Color().setHSL(hue,0.9,0.5+Math.random()*0.4),blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.7}));
   lanternGroup.add(pts);
   lanternParticles.push({
     mesh:pts,x:(Math.random()-0.5)*18,y:Math.random()*12-2,z:(Math.random()-0.5)*12,
@@ -183,7 +229,7 @@ for(let i=0;i<120;i++){
 // STARFIELD — 远景星场
 // ═══════════════════════════════════
 const starfieldGeo=new THREE.BufferGeometry();
-const sfCnt=3500;const sfPos=new Float32Array(sfCnt*3),sfCol=new Float32Array(sfCnt*3),sfS=new Float32Array(sfCnt);
+const sfCnt=scaledCount(3500);const sfPos=new Float32Array(sfCnt*3),sfCol=new Float32Array(sfCnt*3),sfS=new Float32Array(sfCnt);
 for(let i=0;i<sfCnt;i++){
   const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),r=55+Math.random()*80;
   sfPos[i*3]=Math.sin(ph)*Math.cos(th)*r;sfPos[i*3+1]=Math.sin(ph)*Math.sin(th)*r;sfPos[i*3+2]=Math.cos(ph)*r;
@@ -191,7 +237,8 @@ for(let i=0;i<sfCnt;i++){
 }
 starfieldGeo.setAttribute('position',new THREE.BufferAttribute(sfPos,3));
 starfieldGeo.setAttribute('color',new THREE.BufferAttribute(sfCol,3));
-const starfield=new THREE.Points(starfieldGeo,new THREE.PointsMaterial({size:0.12,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.85}));
+const sfPtSize=isMobile?0.15:0.12;
+const starfield=new THREE.Points(starfieldGeo,new THREE.PointsMaterial({size:sfPtSize,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.85}));
 scene.add(starfield);
 
 // ═══════════════════════════════════
@@ -218,10 +265,11 @@ function spawnShootingStar(){
 // ═══════════════════════════════════
 const bursts=[];
 function spawnBurst(pos3d,count=150,color=null){
+  const actualCount=isMobile?Math.floor(count*0.7):count;
   const geo=new THREE.BufferGeometry();
-  const positions=new Float32Array(count*3),colors=new Float32Array(count*3);
+  const positions=new Float32Array(actualCount*3),colors=new Float32Array(actualCount*3);
   const vels=[];const hue=color||0.05+Math.random()*0.12;
-  for(let i=0;i<count;i++){
+  for(let i=0;i<actualCount;i++){
     positions[i*3]=pos3d.x;positions[i*3+1]=pos3d.y;positions[i*3+2]=pos3d.z;
     const c=new THREE.Color().setHSL(hue+Math.random()*0.06,0.9,0.45+Math.random()*0.5);
     colors[i*3]=c.r;colors[i*3+1]=c.g;colors[i*3+2]=c.b;
@@ -230,7 +278,8 @@ function spawnBurst(pos3d,count=150,color=null){
   }
   geo.setAttribute('position',new THREE.BufferAttribute(positions,3));
   geo.setAttribute('color',new THREE.BufferAttribute(colors,3));
-  const pts=new THREE.Points(geo,new THREE.PointsMaterial({size:0.07,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:1}));
+  const burstPtSize=isMobile?0.09:0.07;
+  const pts=new THREE.Points(geo,new THREE.PointsMaterial({size:burstPtSize,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:1}));
   scene.add(pts);bursts.push({points:pts,velocities:vels,life:1,decay:0.007+Math.random()*0.015});
 }
 
@@ -239,53 +288,140 @@ function spawnBurst(pos3d,count=150,color=null){
 // ═══════════════════════════════════
 const cursorTrail=[];
 const cursorTrailGeo=new THREE.BufferGeometry();
-const maxTrail=80;
+const maxTrail=isMobile?50:80;
 const trailPArr=new Float32Array(maxTrail*3),trailCArr=new Float32Array(maxTrail*3);
 cursorTrailGeo.setAttribute('position',new THREE.BufferAttribute(trailPArr,3));
 cursorTrailGeo.setAttribute('color',new THREE.BufferAttribute(trailCArr,3));
-const cursorTrailMesh=new THREE.Points(cursorTrailGeo,new THREE.PointsMaterial({size:0.06,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.8}));
+const trailPtSize=isMobile?0.08:0.06;
+const cursorTrailMesh=new THREE.Points(cursorTrailGeo,new THREE.PointsMaterial({size:trailPtSize,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.8}));
 scene.add(cursorTrailMesh);
 
 // ═══════════════════════════════════
-// INTERACTION
+// INTERACTION — mouse + touch
 // ═══════════════════════════════════
 let mouseOnCanvas=false;
+let touchActive=false;
+
+function updateMouseFromClient(clientX,clientY){
+  mouse.x=(clientX/W)*2-1;mouse.y=-(clientY/H)*2+1;
+}
+
+// Mouse
 canvas3d.addEventListener('mousemove',e=>{
-  mouse.x=(e.clientX/W)*2-1;mouse.y=-(e.clientY/H)*2+1;
+  updateMouseFromClient(e.clientX,e.clientY);
   mouseOnCanvas=true;
 });
 canvas3d.addEventListener('mouseleave',()=>{mouseOnCanvas=false});
-canvas3d.addEventListener('click',e=>{
-  raycaster.setFromCamera(mouse,camera);
-  const dir=raycaster.ray.direction.normalize();
-  const origin=camera.position.clone();
-  const pt=origin.add(dir.multiplyScalar(18+Math.random()*8));
-  spawnBurst(pt,120+Math.floor(Math.random()*100));
-  for(let i=1;i<3;i++)setTimeout(()=>{
-    const p2=camera.position.clone().add(new THREE.Vector3(mouse.x,mouse.y,0.5).normalize().multiplyScalar(16+Math.random()*10));
-    spawnBurst(p2,60+Math.floor(Math.random()*60));
-  },i*100);
+
+// Touch
+let touchStartX=0,touchStartY=0,touchStartTime=0;
+let swipeHandled=false;
+
+canvas3d.addEventListener('touchstart',e=>{
+  e.preventDefault();
+  touchActive=true;mouseOnCanvas=true;
+  const t=e.touches[0];
+  updateMouseFromClient(t.clientX,t.clientY);
+  touchStartX=t.clientX;touchStartY=t.clientY;
+  touchStartTime=Date.now();
+  swipeHandled=false;
+},{passive:false});
+
+canvas3d.addEventListener('touchmove',e=>{
+  e.preventDefault();
+  if(!e.touches.length)return;
+  const t=e.touches[0];
+  updateMouseFromClient(t.clientX,t.clientY);
+
+  // Detect horizontal swipe for stage switching
+  if(!swipeHandled&&e.touches.length===1){
+    const dx=t.clientX-touchStartX;
+    const dy=t.clientY-touchStartY;
+    const absDx=Math.abs(dx),absDy=Math.abs(dy);
+    if(absDx>absDy&&absDx>45){
+      if(dx<0)STATE.targetStage=Math.min(3,STATE.targetStage+1);
+      else STATE.targetStage=Math.max(0,STATE.targetStage-1);
+      updateStageUI();
+      swipeHandled=true;
+      hideSwipeHint();
+    }
+  }
+},{passive:false});
+
+canvas3d.addEventListener('touchend',e=>{
+  mouseOnCanvas=false;touchActive=false;
+  const dt=Date.now()-touchStartTime;
+  const dx=Math.abs((e.changedTouches[0]?.clientX||touchStartX)-touchStartX);
+  const dy=Math.abs((e.changedTouches[0]?.clientY||touchStartY)-touchStartY);
+
+  // Tap → burst + 2D effects (short duration, minimal movement)
+  if(dt<400&&dx<20&&dy<20){
+    const tx=e.changedTouches[0]?.clientX||touchStartX;
+    const ty=e.changedTouches[0]?.clientY||touchStartY;
+    trigger2DEffects(tx,ty);
+    raycaster.setFromCamera(mouse,camera);
+    const dir=raycaster.ray.direction.normalize();
+    const origin=camera.position.clone();
+    const pt=origin.add(dir.multiplyScalar(18+Math.random()*8));
+    const burstCount=isMobile?90:150;
+    spawnBurst(pt,burstCount+Math.floor(Math.random()*burstCount*0.5));
+    for(let i=1;i<(isMobile?2:3);i++)setTimeout(()=>{
+      const p2=camera.position.clone().add(new THREE.Vector3(mouse.x,mouse.y,0.5).normalize().multiplyScalar(16+Math.random()*10));
+      spawnBurst(p2,Math.floor(burstCount*0.4+Math.random()*burstCount*0.3));
+    },i*100);
+  }
 });
+
+// Wheel
 window.addEventListener('wheel',e=>{
   STATE.targetStage=Math.max(0,Math.min(3,STATE.targetStage+(e.deltaY>0?1:-1)));
   updateStageUI();
-});
+  hideSwipeHint();
+},{passive:true});
+
+// Keyboard
 window.addEventListener('keydown',e=>{
   if(e.code==='Space'){e.preventDefault();for(let i=0;i<6;i++)setTimeout(spawnShootingStar,i*150);
     const pt=camera.position.clone().add(new THREE.Vector3(mouse.x,mouse.y,0.5).normalize().multiplyScalar(20));
     for(let i=0;i<4;i++)setTimeout(()=>spawnBurst(pt.clone().add(new THREE.Vector3((Math.random()-0.5)*6,(Math.random()-0.5)*4,(Math.random()-0.5)*6)),200),i*200);
   }
-  if(e.code==='Digit1'){STATE.targetStage=0;updateStageUI()}
-  if(e.code==='Digit2'){STATE.targetStage=1;updateStageUI()}
-  if(e.code==='Digit3'){STATE.targetStage=2;updateStageUI()}
-  if(e.code==='Digit4'){STATE.targetStage=3;updateStageUI()}
+  if(e.code==='Digit1'){STATE.targetStage=0;updateStageUI();hideSwipeHint()}
+  if(e.code==='Digit2'){STATE.targetStage=1;updateStageUI();hideSwipeHint()}
+  if(e.code==='Digit3'){STATE.targetStage=2;updateStageUI();hideSwipeHint()}
+  if(e.code==='Digit4'){STATE.targetStage=3;updateStageUI();hideSwipeHint()}
 });
 
 function updateStageUI(){
   const dots=document.querySelectorAll('.stage-dot');
   dots.forEach((d,i)=>{d.classList.toggle('active',i===STATE.targetStage)});
-  const hints=['💫 银河漫游 · 心之所向','🏮 许愿天灯 · 冉冉升起','💖 心跳星云 · 近在咫尺','✨ 流星雨 · 为你而落'];
-  document.getElementById('hint').textContent='🖱 移动探索 · 点击绽放 · 滚轮/数字键1-4切场景 · 空格许愿  |  '+hints[STATE.targetStage];
+  updateHintText();
+}
+
+const mobileHints=[
+  '💫 银河漫游 · 心之所向',
+  '🏮 许愿天灯 · 冉冉升起',
+  '💖 心跳星云 · 近在咫尺',
+  '✨ 流星雨 · 为你而落',
+];
+const desktopHints=[
+  '🖱 移动探索 · 点击绽放 · 滚轮/数字键1-4切场景 · 空格许愿',
+  '🖱 移动探索 · 点击绽放 · 滚轮/数字键1-4切场景 · 空格许愿',
+  '🖱 移动探索 · 点击绽放 · 滚轮/数字键1-4切场景 · 空格许愿',
+  '🖱 移动探索 · 点击绽放 · 滚轮/数字键1-4切场景 · 空格许愿',
+];
+
+function updateHintText(){
+  const hintEl=document.getElementById('hint');
+  if(isMobile){
+    hintEl.textContent='👆 点击绽放  ·  滑动切换场景  |  '+mobileHints[STATE.targetStage];
+  }else{
+    hintEl.textContent=desktopHints[STATE.targetStage]+'  |  '+mobileHints[STATE.targetStage];
+  }
+}
+
+function hideSwipeHint(){
+  const el=document.getElementById('swipeHint');
+  if(el)el.classList.add('fade');
 }
 
 // ═══════════════════════════════════
@@ -302,14 +438,15 @@ function startAudio(){
   function starDust(){const now=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.setValueAtTime(600+Math.random()*1400,now);o.frequency.exponentialRampToValueAtTime(300+Math.random()*700,now+0.5+Math.random());g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(0.012,now+0.1);g.gain.linearRampToValueAtTime(0,now+0.7+Math.random()*0.5);o.connect(g);g.connect(master);o.start(now);o.stop(now+1.5);setTimeout(starDust,600+Math.random()*2500);}starDust();
   function beat(){const now=ac.currentTime;[0,0.18].forEach(d=>{const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.setValueAtTime(52,now+d);g.gain.setValueAtTime(0,now+d);g.gain.linearRampToValueAtTime(0.07,now+d+0.03);g.gain.linearRampToValueAtTime(0,now+d+0.3);o.connect(g);g.connect(master);o.start(now+d);o.stop(now+d+0.35);});setTimeout(beat,2000);}beat();
 }
-['click','keydown'].forEach(e=>window.addEventListener(e,startAudio,{once:true}));
+['click','keydown','touchstart'].forEach(e=>window.addEventListener(e,startAudio,{once:true}));
 
 // ═══════════════════════════════════
 // CANVAS 2D OVERLAY
 // ═══════════════════════════════════
 const c2d=document.getElementById('c2d');const ctx2=c2d.getContext('2d');
 function rs2d(){W=c2d.width=innerWidth;H=c2d.height=innerHeight}rs2d();window.addEventListener('resize',rs2d);
-const fireflies2D=Array.from({length:40},()=>({
+const fireflyCount=isMobile?25:40;
+const fireflies2D=Array.from({length:fireflyCount},()=>({
   x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.4,vy:(Math.random()-0.5)*0.4-0.1,
   r:Math.random()*2+0.8,phase:Math.random()*Math.PI*2,freq:Math.random()*0.03+0.01,hue:38+Math.random()*25,
 }));
@@ -318,10 +455,16 @@ const ripples2D=[];
 const hearts2D=[];
 const mx={x:W/2,y:H/2};
 window.addEventListener('mousemove',e=>{mx.x=e.clientX;mx.y=e.clientY});
-window.addEventListener('click',e=>{
-  ripples2D.push({x:e.clientX,y:e.clientY,r:2,maxR:70+Math.random()*50,life:1});
-  for(let i=0;i<10;i++)hearts2D.push({x:e.clientX+(Math.random()-0.5)*50,y:e.clientY+(Math.random()-0.5)*30,vx:(Math.random()-0.5)*2.5,vy:-(Math.random()*2.5+1.2),life:1,decay:0.01+Math.random()*0.02,size:10+Math.random()*18,rot:Math.random()*Math.PI*2,hue:340+Math.random()*30});
-});
+window.addEventListener('touchmove',e=>{if(e.touches.length){mx.x=e.touches[0].clientX;mx.y=e.touches[0].clientY}});
+
+function trigger2DEffects(clientX,clientY){
+  ripples2D.push({x:clientX,y:clientY,r:2,maxR:70+Math.random()*50,life:1});
+  const heartCount=isMobile?8:10;
+  for(let i=0;i<heartCount;i++)hearts2D.push({x:clientX+(Math.random()-0.5)*50,y:clientY+(Math.random()-0.5)*30,vx:(Math.random()-0.5)*2.5,vy:-(Math.random()*2.5+1.2),life:1,decay:0.01+Math.random()*0.02,size:10+Math.random()*18,rot:Math.random()*Math.PI*2,hue:340+Math.random()*30});
+}
+
+window.addEventListener('click',e=>{trigger2DEffects(e.clientX,e.clientY)});
+// Touch tap triggers 2D effects via the 3D touch handler (avoids double-fire)
 
 function draw2D(ts){
   ctx2.clearRect(0,0,W,H);
@@ -335,14 +478,15 @@ function draw2D(ts){
     ctx2.beginPath();ctx2.arc(f.x,f.y,f.r*7,0,Math.PI*2);ctx2.fillStyle=g;ctx2.fill();
     ctx2.beginPath();ctx2.arc(f.x,f.y,f.r*0.7,0,Math.PI*2);ctx2.fillStyle=`rgba(255,255,220,${pulse+0.2})`;ctx2.fill();
   }
-  // 鼠标拖尾
-  if(mouseOnCanvas){trails2D.push({x:mx.x+(Math.random()-0.5)*25,y:mx.y+(Math.random()-0.5)*25,life:1,decay:0.02+Math.random()*0.03,r:Math.random()*2+1,hue:35+Math.random()*20});}
+  // 拖尾（鼠标或触摸）
+  if(mouseOnCanvas||touchActive){trails2D.push({x:mx.x+(Math.random()-0.5)*25,y:mx.y+(Math.random()-0.5)*25,life:1,decay:0.02+Math.random()*0.03,r:Math.random()*2+1,hue:35+Math.random()*20});}
+  const trailCap=isMobile?150:250;
   for(let i=trails2D.length-1;i>=0;i--){
     const t2=trails2D[i];t2.life-=t2.decay;t2.y-=0.3;
     if(t2.life<=0){trails2D.splice(i,1);continue}
     ctx2.beginPath();ctx2.arc(t2.x,t2.y,t2.r,0,Math.PI*2);ctx2.fillStyle=`hsla(${t2.hue},85%,70%,${t2.life*0.5})`;ctx2.fill();
   }
-  if(trails2D.length>250)trails2D.splice(0,trails2D.length-250);
+  if(trails2D.length>trailCap)trails2D.splice(0,trails2D.length-trailCap);
   // 涟漪
   for(let i=ripples2D.length-1;i>=0;i--){
     const rp=ripples2D[i];rp.r+=1.8;rp.life-=0.018;
@@ -365,50 +509,57 @@ function draw2D(ts){
 requestAnimationFrame(draw2D);
 
 // ═══════════════════════════════════
-// UI CANVAS — 书法文字
+// UI CANVAS — 书法文字 (mobile-responsive sizing)
 // ═══════════════════════════════════
 const cui=document.getElementById('cui');const ctxu=cui.getContext('2d');
 function rsu(){cui.width=W;cui.height=H}rsu();window.addEventListener('resize',rsu);
 
+// Mobile: use larger relative sizes so text is readable on small screens
+function fsTitle(){return isMobile?Math.max(28,Math.min(W*0.065,48)):Math.min(W*0.04,42)}
+function fsSub(){return isMobile?Math.max(16,Math.min(W*0.035,26)):Math.min(W*0.022,24)}
+function fsSmall(){return isMobile?Math.max(13,Math.min(W*0.028,20)):Math.min(W*0.016,17)}
+function fsBig(){return isMobile?Math.max(24,Math.min(W*0.06,42)):Math.min(W*0.038,38)}
+function fsMedium(){return isMobile?Math.max(22,Math.min(W*0.055,38)):Math.min(W*0.035,36)}
+
 const messages=[
   [
-    {text:'✦ 致  你 ✦',y:0.12,fs:Math.min(W*0.04,42),font:'Ma Shan Zheng',color:'#f5d7a7',glow:'rgba(249,209,112,0.55)'},
-    {text:'星河万里  不及你回眸一笑',y:0.21,fs:Math.min(W*0.022,24),font:'Noto Serif SC',color:'rgba(250,243,232,0.85)',glow:'rgba(250,220,180,0.25)'},
-    {text:'在无垠宇宙中  我找到了最亮的那颗星',y:0.76,fs:Math.min(W*0.016,17),font:'Noto Serif SC',color:'rgba(250,243,232,0.6)',glow:'none'},
-    {text:'那就是你',y:0.86,fs:Math.min(W*0.038,38),font:'Ma Shan Zheng',color:'#f0b8c8',glow:'rgba(240,184,200,0.45)'},
+    {text:'✦ 致  喵喵 ✦',y:0.12,fsFn:'title',font:'Ma Shan Zheng',color:'#f5d7a7',glow:'rgba(249,209,112,0.55)'},
+    {text:'星河万里  不及你回眸一笑',y:0.21,fsFn:'sub',font:'Noto Serif SC',color:'rgba(250,243,232,0.85)',glow:'rgba(250,220,180,0.25)'},
+    {text:'在无垠宇宙中  我找到了最亮的那颗星',y:0.76,fsFn:'small',font:'Noto Serif SC',color:'rgba(250,243,232,0.6)',glow:'none'},
+    {text:'那就是你',y:0.86,fsFn:'big',font:'Ma Shan Zheng',color:'#f0b8c8',glow:'rgba(240,184,200,0.45)'},
   ],
   [
-    {text:'🏮 许愿灯海',y:0.12,fs:Math.min(W*0.04,42),font:'Ma Shan Zheng',color:'#f9d170',glow:'rgba(249,209,112,0.55)'},
-    {text:'每一盏升起的灯  都是一个心愿',y:0.22,fs:Math.min(W*0.02,22),font:'Noto Serif SC',color:'rgba(250,243,232,0.8)',glow:'rgba(250,200,140,0.2)'},
-    {text:'愿它们飘向你  替我诉说',y:0.78,fs:Math.min(W*0.017,18),font:'Noto Serif SC',color:'rgba(250,243,232,0.55)',glow:'none'},
-    {text:'那些说不出口的喜欢',y:0.87,fs:Math.min(W*0.035,36),font:'Ma Shan Zheng',color:'#f0b8c8',glow:'rgba(240,184,200,0.4)'},
+    {text:'🏮 许愿灯海',y:0.12,fsFn:'title',font:'Ma Shan Zheng',color:'#f9d170',glow:'rgba(249,209,112,0.55)'},
+    {text:'每一盏升起的灯  都是一个心愿',y:0.22,fsFn:'sub',font:'Noto Serif SC',color:'rgba(250,243,232,0.8)',glow:'rgba(250,200,140,0.2)'},
+    {text:'愿它们飘向你  替我诉说',y:0.78,fsFn:'small',font:'Noto Serif SC',color:'rgba(250,243,232,0.55)',glow:'none'},
+    {text:'那些说不出口的喜欢',y:0.87,fsFn:'medium',font:'Ma Shan Zheng',color:'#f0b8c8',glow:'rgba(240,184,200,0.4)'},
   ],
   [
-    {text:'💖 心跳星云',y:0.13,fs:Math.min(W*0.04,42),font:'Ma Shan Zheng',color:'#f0b8c8',glow:'rgba(240,150,180,0.5)'},
-    {text:'每一次心跳  都在呼唤你的名字',y:0.23,fs:Math.min(W*0.02,22),font:'Noto Serif SC',color:'rgba(250,243,232,0.8)',glow:'rgba(240,180,200,0.2)'},
-    {text:'你听见了吗',y:0.79,fs:Math.min(W*0.018,19),font:'Noto Serif SC',color:'rgba(250,243,232,0.55)',glow:'none'},
-    {text:'这颗心  为你而跳动',y:0.88,fs:Math.min(W*0.033,34),font:'Ma Shan Zheng',color:'#f5d7a7',glow:'rgba(249,209,112,0.4)'},
+    {text:'💖 心跳星云',y:0.13,fsFn:'title',font:'Ma Shan Zheng',color:'#f0b8c8',glow:'rgba(240,150,180,0.5)'},
+    {text:'每一次心跳  都在呼唤你的名字',y:0.23,fsFn:'sub',font:'Noto Serif SC',color:'rgba(250,243,232,0.8)',glow:'rgba(240,180,200,0.2)'},
+    {text:'你听见了吗',y:0.79,fsFn:'small',font:'Noto Serif SC',color:'rgba(250,243,232,0.55)',glow:'none'},
+    {text:'这颗心  为你而跳动',y:0.88,fsFn:'medium',font:'Ma Shan Zheng',color:'#f5d7a7',glow:'rgba(249,209,112,0.4)'},
   ],
   [
-    {text:'✨ 流星雨',y:0.12,fs:Math.min(W*0.04,42),font:'Ma Shan Zheng',color:'#f5d7a7',glow:'rgba(249,209,112,0.55)'},
-    {text:'每颗流星划过  都是我在想你',y:0.21,fs:Math.min(W*0.021,23),font:'Noto Serif SC',color:'rgba(250,243,232,0.85)',glow:'rgba(250,200,150,0.25)'},
-    {text:'如果流星能实现愿望',y:0.77,fs:Math.min(W*0.017,18),font:'Noto Serif SC',color:'rgba(250,243,232,0.55)',glow:'none'},
-    {text:'我想和你在一起  永远',y:0.87,fs:Math.min(W*0.034,35),font:'Ma Shan Zheng',color:'#ffb3c6',glow:'rgba(255,160,190,0.5)'},
+    {text:'✨ 流星雨',y:0.12,fsFn:'title',font:'Ma Shan Zheng',color:'#f5d7a7',glow:'rgba(249,209,112,0.55)'},
+    {text:'每颗流星划过  都是我在想你',y:0.21,fsFn:'sub',font:'Noto Serif SC',color:'rgba(250,243,232,0.85)',glow:'rgba(250,200,150,0.25)'},
+    {text:'如果流星能实现愿望',y:0.77,fsFn:'small',font:'Noto Serif SC',color:'rgba(250,243,232,0.55)',glow:'none'},
+    {text:'我想和你在一起  永远',y:0.87,fsFn:'big',font:'Ma Shan Zheng',color:'#ffb3c6',glow:'rgba(255,160,190,0.5)'},
   ],
 ];
 
+const fsMap={title:fsTitle,sub:fsSub,small:fsSmall,big:fsBig,medium:fsMedium};
+
 function drawUI(ts){
   ctxu.clearRect(0,0,W,H);
-  const T=ts*0.001;
   const msg=messages[STATE.stage]||messages[0];
   const fadeProgress=STATE.stageTransition;
 
   for(const line of msg){
-    const elapsed=T-line.delay||(T-0.5);
-    // 简化：所有行统一淡入
+    const fps=fsMap[line.fsFn]?fsMap[line.fsFn]():fsTitle();
     const alpha=Math.min(1,Math.max(0,fadeProgress*2));
     if(alpha<=0)continue;
-    ctxu.save();ctxu.font=`${line.fs}px "${line.font}","Noto Serif SC",cursive`;ctxu.textAlign='center';ctxu.textBaseline='middle';
+    ctxu.save();ctxu.font=`${fps}px "${line.font}","Noto Serif SC",cursive`;ctxu.textAlign='center';ctxu.textBaseline='middle';
     if(line.glow!=='none'){ctxu.shadowColor=line.glow;ctxu.shadowBlur=18*alpha}
     ctxu.globalAlpha=alpha;
     ctxu.fillStyle=line.color;ctxu.fillText(line.text,W/2,H*line.y);
@@ -440,7 +591,6 @@ function animate(ts){
   // 星系旋转
   galaxyGroup.rotation.y+=dt*0.06;
   galaxyGroup.rotation.x=Math.sin(STATE.t*0.15)*0.08;
-  // 可见性
   const galaxyAlpha=s===0?1:s===1?0.5:s===2?0.3:0.4;
   galaxyGroup.children.forEach(c=>{if(c.material&&c.material.opacity!==undefined)c.material.opacity=galaxyAlpha* (c===coreGlow?0.9:0.7)});
 
@@ -464,7 +614,7 @@ function animate(ts){
     lp.mesh.position.set(lp.x,lp.y,lp.z);
   }
 
-  // 流星生成频率随场景
+  // 流星生成频率
   const shootingStarChance=s===3?0.03:s===0?0.006:s===2?0.004:0.008;
   if(Math.random()<shootingStarChance)spawnShootingStar();
 
@@ -482,7 +632,7 @@ function animate(ts){
   // 星云
   nebulae.forEach((n,i)=>n.rotation.y+=dt*(0.02+i*0.005));
 
-  // 更新爆发粒子
+  // 爆发粒子
   for(let i=bursts.length-1;i>=0;i--){
     const b=bursts[i];b.life-=b.decay;
     if(b.life<=0){scene.remove(b.points);b.points.geometry.dispose();b.points.material.dispose();bursts.splice(i,1);continue}
@@ -491,8 +641,8 @@ function animate(ts){
     b.points.geometry.attributes.position.needsUpdate=true;b.points.material.opacity=b.life*0.85;
   }
 
-  // 3D 光标拖尾
-  if(mouseOnCanvas){
+  // 3D 光标/触摸拖尾
+  if(mouseOnCanvas||touchActive){
     raycaster.setFromCamera(mouse,camera);
     const pt=raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(20));
     cursorTrail.push({x:pt.x,y:pt.y,z:pt.z,life:1});
@@ -518,7 +668,8 @@ function animate(ts){
   ];
   const ct=camTargets[s];
   const baseTarget=new THREE.Vector3(ct.x,ct.y,ct.z);
-  const mouseOffset=new THREE.Vector3(mouse.x*3.5,mouse.y*2,0);
+  const mouseMultiplier=isMobile?2.5:3.5;
+  const mouseOffset=new THREE.Vector3(mouse.x*mouseMultiplier,mouse.y*mouseMultiplier*0.55,0);
   const desired=baseTarget.clone().add(mouseOffset);
   camera.position.lerp(desired,0.025);
   camera.lookAt(0,0.3,0);
@@ -527,9 +678,16 @@ function animate(ts){
 }
 resize3D();function resize3D(){W=innerWidth;H=innerHeight;renderer.setSize(W,H);composer.setSize(W,H);camera.aspect=W/H;camera.updateProjectionMatrix();rs2d();rsu()}
 window.addEventListener('resize',resize3D);
+window.addEventListener('orientationchange',()=>setTimeout(resize3D,300));
 requestAnimationFrame(animate);
 updateStageUI();
-console.log('%c💛 星河万里，不及你。%c\nFour scenes · Scroll to explore · Click to bloom · Space for wishes',
+
+// Show swipe hint on mobile, auto-hide after 8 seconds or first interaction
+if(isMobile){
+  setTimeout(()=>hideSwipeHint(),8000);
+}
+
+console.log('%c💛 星河万里，不及喵喵。%c\n滑动切换场景 · 点击绽放烟花',
   'font-size:1.3em;color:#f5d7a7;','color:#888;');
 </script>
 </body>

@@ -1,1 +1,536 @@
 
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>致 你 — 星河万里</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;400;700&family=Ma+Shan+Zheng&family=Long+Cang&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000008;overflow:hidden;font-family:'Noto Serif SC',serif;cursor:none;height:100vh;width:100vw;-webkit-tap-highlight-color:transparent}
+canvas{display:block;position:fixed;top:0;left:0}
+#c3d{z-index:0}
+#c2d{z-index:1;pointer-events:none}
+#cui{z-index:2;pointer-events:none}
+.stage-hint{position:fixed;bottom:36px;left:50%;transform:translateX(-50%);z-index:5;pointer-events:none;color:rgba(255,240,210,0.45);font-size:0.82rem;letter-spacing:0.22em;transition:all 1s;font-family:'Noto Serif SC',serif}
+.stage-indicator{position:fixed;top:32px;right:36px;z-index:5;pointer-events:none;display:flex;gap:10px;flex-direction:column}
+.stage-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.2);transition:all 0.6s}
+.stage-dot.active{background:rgba(249,209,112,0.9);box-shadow:0 0 14px rgba(249,209,112,0.6)}
+</style>
+</head>
+<body>
+
+<canvas id="c3d"></canvas>
+<canvas id="c2d"></canvas>
+<canvas id="cui"></canvas>
+
+<div class="stage-indicator" id="indicator">
+  <div class="stage-dot active"></div><div class="stage-dot"></div><div class="stage-dot"></div><div class="stage-dot"></div>
+</div>
+<div class="stage-hint" id="hint">🖱 移动探索 · 点击绽放 · 滚轮切换场景 · 空格许愿</div>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js';
+
+// ═══════════════════════════════════
+// GLOBAL STATE
+// ═══════════════════════════════════
+const STATE={stage:0,targetStage:0,stageTransition:0,t:0,dt:0};
+const mouse=new THREE.Vector2();
+const mouseWorld=new THREE.Vector3();
+const raycaster=new THREE.Raycaster();
+let W,H;
+
+// ═══════════════════════════════════
+// THREE.JS SETUP
+// ═══════════════════════════════════
+const canvas3d=document.getElementById('c3d');
+const renderer=new THREE.WebGLRenderer({canvas:canvas3d,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.toneMapping=THREE.ReinhardToneMapping;
+renderer.toneMappingExposure=1.1;
+const scene=new THREE.Scene();
+const camera=new THREE.PerspectiveCamera(55,2,0.1,300);
+camera.position.set(0,2,32);
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(2,2),0.65,0.35,0.15);
+composer.addPass(bloom);
+composer.addPass(new AfterimagePass(0.1));
+
+// ═══════════════════════════════════
+// GALAXY — 大螺旋星系
+// ═══════════════════════════════════
+const galaxyGroup=new THREE.Group(); scene.add(galaxyGroup);
+const galaxyArms=[];
+const armColors=[
+  new THREE.Color('#ffe8d6'),new THREE.Color('#ffd1a9'),new THREE.Color('#f0c8a0'),
+  new THREE.Color('#ffe0f0'),new THREE.Color('#e0d0ff'),new THREE.Color('#d0e8ff'),
+];
+
+for(let arm=0;arm<5;arm++){
+  const cnt=2000;const geo=new THREE.BufferGeometry();
+  const pos=new Float32Array(cnt*3),col=new Float32Array(cnt*3);
+  const baseAngle=(arm/5)*Math.PI*2;
+  const bc=armColors[arm];
+  for(let i=0;i<cnt;i++){
+    const t2=i/cnt, r=1.2+t2*22;
+    const spiralAngle=baseAngle+t2*Math.PI*3.8;
+    const scatter=(Math.random()-0.5)*(0.3+t2*2.5);
+    const angle=spiralAngle+scatter/r;
+    const h=(Math.random()-0.5)*(0.15+t2*1.2);
+    pos[i*3]=Math.cos(angle)*r; pos[i*3+1]=h; pos[i*3+2]=Math.sin(angle)*r;
+    const c=bc.clone();c.r+=(Math.random()-0.5)*0.12;c.g+=(Math.random()-0.5)*0.1;c.b+=(Math.random()-0.5)*0.08;
+    col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  const pts=new THREE.Points(geo,new THREE.PointsMaterial({size:0.09,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.7}));
+  galaxyGroup.add(pts);galaxyArms.push(pts);
+}
+
+// 星系核心亮团
+const coreGeo=new THREE.BufferGeometry();
+const coreCnt=600;const coreP=new Float32Array(coreCnt*3),coreC=new Float32Array(coreCnt*3);
+for(let i=0;i<coreCnt;i++){
+  const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),r=Math.random()*3.5;
+  coreP[i*3]=Math.sin(ph)*Math.cos(th)*r;coreP[i*3+1]=Math.sin(ph)*Math.sin(th)*r*0.4;coreP[i*3+2]=Math.cos(ph)*r;
+  coreC[i*3]=1;coreC[i*3+1]=0.9+Math.random()*0.1;coreC[i*3+2]=0.7+Math.random()*0.3;
+}
+coreGeo.setAttribute('position',new THREE.BufferAttribute(coreP,3));
+coreGeo.setAttribute('color',new THREE.BufferAttribute(coreC,3));
+const coreGlow=new THREE.Points(coreGeo,new THREE.PointsMaterial({size:0.18,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.9}));
+galaxyGroup.add(coreGlow);
+
+// ═══════════════════════════════════
+// NEBULA — 星云粒子团
+// ═══════════════════════════════════
+const nebulae=[];
+for(let n=0;n<4;n++){
+  const grp=new THREE.Group();
+  const cnt=400;const geo=new THREE.BufferGeometry();
+  const pos=new Float32Array(cnt*3),col=new Float32Array(cnt*3);
+  const cx=(n-1.5)*10,cy=(Math.random()-0.5)*4,cz=-5+Math.random()*10;
+  const hue=[0.08,0.15,0.7,0.85][n];
+  for(let i=0;i<cnt;i++){
+    const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),r=Math.random()*4;
+    pos[i*3]=cx+Math.sin(ph)*Math.cos(th)*r;pos[i*3+1]=cy+Math.sin(ph)*Math.sin(th)*r*0.4;pos[i*3+2]=cz+Math.cos(ph)*r;
+    const c=new THREE.Color().setHSL(hue+Math.random()*0.06,0.7,0.4+Math.random()*0.5);
+    col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  grp.add(new THREE.Points(geo,new THREE.PointsMaterial({size:0.25,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.35})));
+  scene.add(grp);nebulae.push(grp);
+}
+
+// ═══════════════════════════════════
+// HEART — 3D 心脏（场景1焦点）
+// ═══════════════════════════════════
+const heartGroup=new THREE.Group();scene.add(heartGroup);
+function heartEq(t,s=1){return{x:16*Math.sin(t)**3*s*0.08,y:(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))*s*0.08}}
+for(let L=0;L<7;L++){
+  const cnt=1500+L*250;const geo=new THREE.BufferGeometry();
+  const pos=new Float32Array(cnt*3),col=new Float32Array(cnt*3);
+  const bc=new THREE.Color().setHSL(0.95-L*0.04,0.9,0.55+L*0.07);
+  const sc=1+L*0.22;
+  for(let i=0;i<cnt;i++){
+    const t2=(i/cnt)*Math.PI*2,h=heartEq(t2,sc);
+    const zd=(Math.random()-0.5)*(1+L*0.2),ef=1-Math.abs(h.y)/1.6;
+    pos[i*3]=h.x+(Math.random()-0.5)*0.03;pos[i*3+1]=h.y+(Math.random()-0.5)*0.03;pos[i*3+2]=zd*(0.2+ef*0.8);
+    const c=bc.clone();c.r+=(Math.random()-0.5)*0.1;c.g+=(Math.random()-0.5)*0.08;c.b+=(Math.random()-0.5)*0.05;
+    col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));
+  heartGroup.add(new THREE.Points(geo,new THREE.PointsMaterial({size:0.08,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.8-L*0.06})));
+}
+// 心脏光环
+for(let r=0;r<4;r++){
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(1.6+r*0.4,0.012,32,200),new THREE.MeshBasicMaterial({color:new THREE.Color().setHSL(0.95-r*0.06,0.9,0.6+r*0.12),transparent:true,opacity:0.4-r*0.08,blending:THREE.AdditiveBlending,depthWrite:false}));
+  ring.rotation.x=Math.PI/3+r*0.3;ring.rotation.y=r*0.6;heartGroup.add(ring);ring.userData={axis:r%2?'x':'y',speed:0.18+r*0.06,offset:r};
+}
+
+// ═══════════════════════════════════
+// LANTERNS — 天灯粒子群（场景2）
+// ═══════════════════════════════════
+const lanternGroup=new THREE.Group();scene.add(lanternGroup);
+const lanternParticles=[];
+for(let i=0;i<120;i++){
+  const geo=new THREE.BufferGeometry();
+  const p=new Float32Array([0,0,0]);
+  geo.setAttribute('position',new THREE.BufferAttribute(p,3));
+  const hue=0.08+Math.random()*0.1;
+  const pts=new THREE.Points(geo,new THREE.PointsMaterial({size:0.35+Math.random()*0.5,color:new THREE.Color().setHSL(hue,0.9,0.5+Math.random()*0.4),blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.7}));
+  lanternGroup.add(pts);
+  lanternParticles.push({
+    mesh:pts,x:(Math.random()-0.5)*18,y:Math.random()*12-2,z:(Math.random()-0.5)*12,
+    vy:0.3+Math.random()*0.6,vx:(Math.random()-0.5)*0.2,phase:Math.random()*Math.PI*2,
+    baseY:Math.random()*12-2
+  });
+}
+
+// ═══════════════════════════════════
+// STARFIELD — 远景星场
+// ═══════════════════════════════════
+const starfieldGeo=new THREE.BufferGeometry();
+const sfCnt=3500;const sfPos=new Float32Array(sfCnt*3),sfCol=new Float32Array(sfCnt*3),sfS=new Float32Array(sfCnt);
+for(let i=0;i<sfCnt;i++){
+  const th=Math.random()*Math.PI*2,ph=Math.acos(2*Math.random()-1),r=55+Math.random()*80;
+  sfPos[i*3]=Math.sin(ph)*Math.cos(th)*r;sfPos[i*3+1]=Math.sin(ph)*Math.sin(th)*r;sfPos[i*3+2]=Math.cos(ph)*r;
+  const w=Math.random();sfCol[i*3]=0.6+w*0.4;sfCol[i*3+1]=0.4+w*0.45;sfCol[i*3+2]=0.35+w*0.55;sfS[i]=Math.random()*0.07+0.02;
+}
+starfieldGeo.setAttribute('position',new THREE.BufferAttribute(sfPos,3));
+starfieldGeo.setAttribute('color',new THREE.BufferAttribute(sfCol,3));
+const starfield=new THREE.Points(starfieldGeo,new THREE.PointsMaterial({size:0.12,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:0.85}));
+scene.add(starfield);
+
+// ═══════════════════════════════════
+// SHOOTING STARS
+// ═══════════════════════════════════
+const shootingStars=[];
+function spawnShootingStar(){
+  const geo=new THREE.BufferGeometry();
+  const len=6+Math.random()*14;
+  const p=new Float32Array([0,0,0, -len,0,0]);
+  geo.setAttribute('position',new THREE.BufferAttribute(p,3));
+  const line=new THREE.Line(geo,new THREE.LineBasicMaterial({color:new THREE.Color().setHSL(0.12,0.8,0.7+Math.random()*0.3),transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false}));
+  const sx=(Math.random()-0.5)*24,sy=5+Math.random()*8,sz=(Math.random()-0.5)*14;
+  line.position.set(sx,sy,sz);
+  line.rotation.z=Math.PI/6+(Math.random()-0.5)*0.3;
+  line.rotation.y=(Math.random()-0.5)*0.5;
+  scene.add(line);
+  const vel=new THREE.Vector3(Math.cos(line.rotation.z)*0.35,-Math.sin(line.rotation.z)*0.35,0);
+  shootingStars.push({mesh:line,vel,life:1,decay:0.006+Math.random()*0.01});
+}
+
+// ═══════════════════════════════════
+// BURST SYSTEM
+// ═══════════════════════════════════
+const bursts=[];
+function spawnBurst(pos3d,count=150,color=null){
+  const geo=new THREE.BufferGeometry();
+  const positions=new Float32Array(count*3),colors=new Float32Array(count*3);
+  const vels=[];const hue=color||0.05+Math.random()*0.12;
+  for(let i=0;i<count;i++){
+    positions[i*3]=pos3d.x;positions[i*3+1]=pos3d.y;positions[i*3+2]=pos3d.z;
+    const c=new THREE.Color().setHSL(hue+Math.random()*0.06,0.9,0.45+Math.random()*0.5);
+    colors[i*3]=c.r;colors[i*3+1]=c.g;colors[i*3+2]=c.b;
+    const spd=0.05+Math.random()*0.25;
+    vels.push(new THREE.Vector3((Math.random()-0.5)*2,(Math.random()-0.5)*2,(Math.random()-0.5)*2).normalize().multiplyScalar(spd));
+  }
+  geo.setAttribute('position',new THREE.BufferAttribute(positions,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(colors,3));
+  const pts=new THREE.Points(geo,new THREE.PointsMaterial({size:0.07,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:1}));
+  scene.add(pts);bursts.push({points:pts,velocities:vels,life:1,decay:0.007+Math.random()*0.015});
+}
+
+// ═══════════════════════════════════
+// CURSOR PARTICLE TRAIL (3D)
+// ═══════════════════════════════════
+const cursorTrail=[];
+const cursorTrailGeo=new THREE.BufferGeometry();
+const maxTrail=80;
+const trailPArr=new Float32Array(maxTrail*3),trailCArr=new Float32Array(maxTrail*3);
+cursorTrailGeo.setAttribute('position',new THREE.BufferAttribute(trailPArr,3));
+cursorTrailGeo.setAttribute('color',new THREE.BufferAttribute(trailCArr,3));
+const cursorTrailMesh=new THREE.Points(cursorTrailGeo,new THREE.PointsMaterial({size:0.06,vertexColors:true,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:0.8}));
+scene.add(cursorTrailMesh);
+
+// ═══════════════════════════════════
+// INTERACTION
+// ═══════════════════════════════════
+let mouseOnCanvas=false;
+canvas3d.addEventListener('mousemove',e=>{
+  mouse.x=(e.clientX/W)*2-1;mouse.y=-(e.clientY/H)*2+1;
+  mouseOnCanvas=true;
+});
+canvas3d.addEventListener('mouseleave',()=>{mouseOnCanvas=false});
+canvas3d.addEventListener('click',e=>{
+  raycaster.setFromCamera(mouse,camera);
+  const dir=raycaster.ray.direction.normalize();
+  const origin=camera.position.clone();
+  const pt=origin.add(dir.multiplyScalar(18+Math.random()*8));
+  spawnBurst(pt,120+Math.floor(Math.random()*100));
+  for(let i=1;i<3;i++)setTimeout(()=>{
+    const p2=camera.position.clone().add(new THREE.Vector3(mouse.x,mouse.y,0.5).normalize().multiplyScalar(16+Math.random()*10));
+    spawnBurst(p2,60+Math.floor(Math.random()*60));
+  },i*100);
+});
+window.addEventListener('wheel',e=>{
+  STATE.targetStage=Math.max(0,Math.min(3,STATE.targetStage+(e.deltaY>0?1:-1)));
+  updateStageUI();
+});
+window.addEventListener('keydown',e=>{
+  if(e.code==='Space'){e.preventDefault();for(let i=0;i<6;i++)setTimeout(spawnShootingStar,i*150);
+    const pt=camera.position.clone().add(new THREE.Vector3(mouse.x,mouse.y,0.5).normalize().multiplyScalar(20));
+    for(let i=0;i<4;i++)setTimeout(()=>spawnBurst(pt.clone().add(new THREE.Vector3((Math.random()-0.5)*6,(Math.random()-0.5)*4,(Math.random()-0.5)*6)),200),i*200);
+  }
+  if(e.code==='Digit1'){STATE.targetStage=0;updateStageUI()}
+  if(e.code==='Digit2'){STATE.targetStage=1;updateStageUI()}
+  if(e.code==='Digit3'){STATE.targetStage=2;updateStageUI()}
+  if(e.code==='Digit4'){STATE.targetStage=3;updateStageUI()}
+});
+
+function updateStageUI(){
+  const dots=document.querySelectorAll('.stage-dot');
+  dots.forEach((d,i)=>{d.classList.toggle('active',i===STATE.targetStage)});
+  const hints=['💫 银河漫游 · 心之所向','🏮 许愿天灯 · 冉冉升起','💖 心跳星云 · 近在咫尺','✨ 流星雨 · 为你而落'];
+  document.getElementById('hint').textContent='🖱 移动探索 · 点击绽放 · 滚轮/数字键1-4切场景 · 空格许愿  |  '+hints[STATE.targetStage];
+}
+
+// ═══════════════════════════════════
+// WEB AUDIO — 场景感知音乐
+// ═══════════════════════════════════
+let audioStarted=false;
+function startAudio(){
+  if(audioStarted)return;audioStarted=true;
+  const ac=new AudioContext(),master=ac.createGain();master.gain.setValueAtTime(0.05,ac.currentTime);master.connect(ac.destination);
+  const chords=[[261.63,329.63,392.00],[293.66,369.99,440.00],[349.23,440.00,523.25],[329.63,392.00,493.88],[261.63,349.23,440.00],[293.66,392.00,493.88]];
+  let chordIdx=0;
+  function playChord(freqs,st,dur){freqs.forEach((f,i)=>{const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.setValueAtTime(f,st);o.frequency.setValueAtTime(f+1.5,st+dur*0.8);g.gain.setValueAtTime(0,st);g.gain.linearRampToValueAtTime(0.035/freqs.length,st+0.5);g.gain.linearRampToValueAtTime(0.02/freqs.length,st+dur*0.7);g.gain.linearRampToValueAtTime(0,st+dur);o.connect(g);g.connect(master);o.start(st);o.stop(st+dur);});}
+  function sched(){const now=ac.currentTime;for(let i=0;i<10;i++)playChord(chords[(chordIdx+i)%chords.length],now+i*5.5,6);chordIdx=(chordIdx+1)%chords.length;setTimeout(sched,5.5*9*1000);}sched();
+  function starDust(){const now=ac.currentTime,o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.setValueAtTime(600+Math.random()*1400,now);o.frequency.exponentialRampToValueAtTime(300+Math.random()*700,now+0.5+Math.random());g.gain.setValueAtTime(0,now);g.gain.linearRampToValueAtTime(0.012,now+0.1);g.gain.linearRampToValueAtTime(0,now+0.7+Math.random()*0.5);o.connect(g);g.connect(master);o.start(now);o.stop(now+1.5);setTimeout(starDust,600+Math.random()*2500);}starDust();
+  function beat(){const now=ac.currentTime;[0,0.18].forEach(d=>{const o=ac.createOscillator(),g=ac.createGain();o.type='sine';o.frequency.setValueAtTime(52,now+d);g.gain.setValueAtTime(0,now+d);g.gain.linearRampToValueAtTime(0.07,now+d+0.03);g.gain.linearRampToValueAtTime(0,now+d+0.3);o.connect(g);g.connect(master);o.start(now+d);o.stop(now+d+0.35);});setTimeout(beat,2000);}beat();
+}
+['click','keydown'].forEach(e=>window.addEventListener(e,startAudio,{once:true}));
+
+// ═══════════════════════════════════
+// CANVAS 2D OVERLAY
+// ═══════════════════════════════════
+const c2d=document.getElementById('c2d');const ctx2=c2d.getContext('2d');
+function rs2d(){W=c2d.width=innerWidth;H=c2d.height=innerHeight}rs2d();window.addEventListener('resize',rs2d);
+const fireflies2D=Array.from({length:40},()=>({
+  x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-0.5)*0.4,vy:(Math.random()-0.5)*0.4-0.1,
+  r:Math.random()*2+0.8,phase:Math.random()*Math.PI*2,freq:Math.random()*0.03+0.01,hue:38+Math.random()*25,
+}));
+const trails2D=[];
+const ripples2D=[];
+const hearts2D=[];
+const mx={x:W/2,y:H/2};
+window.addEventListener('mousemove',e=>{mx.x=e.clientX;mx.y=e.clientY});
+window.addEventListener('click',e=>{
+  ripples2D.push({x:e.clientX,y:e.clientY,r:2,maxR:70+Math.random()*50,life:1});
+  for(let i=0;i<10;i++)hearts2D.push({x:e.clientX+(Math.random()-0.5)*50,y:e.clientY+(Math.random()-0.5)*30,vx:(Math.random()-0.5)*2.5,vy:-(Math.random()*2.5+1.2),life:1,decay:0.01+Math.random()*0.02,size:10+Math.random()*18,rot:Math.random()*Math.PI*2,hue:340+Math.random()*30});
+});
+
+function draw2D(ts){
+  ctx2.clearRect(0,0,W,H);
+  // 萤火虫
+  for(const f of fireflies2D){
+    f.x+=f.vx+Math.sin(ts*0.003+f.phase)*0.2;f.y+=f.vy+Math.cos(ts*0.0025+f.phase)*0.15;
+    if(f.x<-20)f.x=W+20;if(f.x>W+20)f.x=-20;if(f.y<-20)f.y=H+20;if(f.y>H+20)f.y=-20;
+    const pulse=0.3+Math.sin(ts*f.freq*0.06+f.phase)*0.3;
+    const g=ctx2.createRadialGradient(f.x,f.y,0,f.x,f.y,f.r*7);
+    g.addColorStop(0,`rgba(255,245,150,${pulse})`);g.addColorStop(0.4,`rgba(255,200,90,${pulse*0.45})`);g.addColorStop(1,'rgba(255,160,50,0)');
+    ctx2.beginPath();ctx2.arc(f.x,f.y,f.r*7,0,Math.PI*2);ctx2.fillStyle=g;ctx2.fill();
+    ctx2.beginPath();ctx2.arc(f.x,f.y,f.r*0.7,0,Math.PI*2);ctx2.fillStyle=`rgba(255,255,220,${pulse+0.2})`;ctx2.fill();
+  }
+  // 鼠标拖尾
+  if(mouseOnCanvas){trails2D.push({x:mx.x+(Math.random()-0.5)*25,y:mx.y+(Math.random()-0.5)*25,life:1,decay:0.02+Math.random()*0.03,r:Math.random()*2+1,hue:35+Math.random()*20});}
+  for(let i=trails2D.length-1;i>=0;i--){
+    const t2=trails2D[i];t2.life-=t2.decay;t2.y-=0.3;
+    if(t2.life<=0){trails2D.splice(i,1);continue}
+    ctx2.beginPath();ctx2.arc(t2.x,t2.y,t2.r,0,Math.PI*2);ctx2.fillStyle=`hsla(${t2.hue},85%,70%,${t2.life*0.5})`;ctx2.fill();
+  }
+  if(trails2D.length>250)trails2D.splice(0,trails2D.length-250);
+  // 涟漪
+  for(let i=ripples2D.length-1;i>=0;i--){
+    const rp=ripples2D[i];rp.r+=1.8;rp.life-=0.018;
+    if(rp.life<=0){ripples2D.splice(i,1);continue}
+    ctx2.beginPath();ctx2.arc(rp.x,rp.y,rp.r,0,Math.PI*2);ctx2.strokeStyle=`rgba(255,210,170,${rp.life*0.5})`;ctx2.lineWidth=1.5;ctx2.stroke();
+  }
+  // 浮空心形
+  for(let i=hearts2D.length-1;i>=0;i--){
+    const h=hearts2D[i];h.x+=h.vx;h.y+=h.vy;h.vy+=0.015;h.life-=h.decay;h.rot+=0.03;
+    if(h.life<=0){hearts2D.splice(i,1);continue}
+    ctx2.save();ctx2.translate(h.x,h.y);ctx2.rotate(h.rot);ctx2.globalAlpha=h.life*0.8;
+    ctx2.font=`${h.size}px serif`;ctx2.fillStyle=`hsl(${h.hue},80%,70%)`;ctx2.textAlign='center';ctx2.textBaseline='middle';
+    ctx2.fillText('♥',0,0);ctx2.restore();
+  }
+  // 底部雾
+  const fog=ctx2.createLinearGradient(0,H*0.68,0,H);fog.addColorStop(0,'rgba(8,3,20,0)');fog.addColorStop(1,'rgba(5,2,15,0.55)');
+  ctx2.fillStyle=fog;ctx2.fillRect(0,H*0.68,W,H*0.32);
+  requestAnimationFrame(draw2D);
+}
+requestAnimationFrame(draw2D);
+
+// ═══════════════════════════════════
+// UI CANVAS — 书法文字
+// ═══════════════════════════════════
+const cui=document.getElementById('cui');const ctxu=cui.getContext('2d');
+function rsu(){cui.width=W;cui.height=H}rsu();window.addEventListener('resize',rsu);
+
+const messages=[
+  [
+    {text:'✦ 致  你 ✦',y:0.12,fs:Math.min(W*0.04,42),font:'Ma Shan Zheng',color:'#f5d7a7',glow:'rgba(249,209,112,0.55)'},
+    {text:'星河万里  不及你回眸一笑',y:0.21,fs:Math.min(W*0.022,24),font:'Noto Serif SC',color:'rgba(250,243,232,0.85)',glow:'rgba(250,220,180,0.25)'},
+    {text:'在无垠宇宙中  我找到了最亮的那颗星',y:0.76,fs:Math.min(W*0.016,17),font:'Noto Serif SC',color:'rgba(250,243,232,0.6)',glow:'none'},
+    {text:'那就是你',y:0.86,fs:Math.min(W*0.038,38),font:'Ma Shan Zheng',color:'#f0b8c8',glow:'rgba(240,184,200,0.45)'},
+  ],
+  [
+    {text:'🏮 许愿灯海',y:0.12,fs:Math.min(W*0.04,42),font:'Ma Shan Zheng',color:'#f9d170',glow:'rgba(249,209,112,0.55)'},
+    {text:'每一盏升起的灯  都是一个心愿',y:0.22,fs:Math.min(W*0.02,22),font:'Noto Serif SC',color:'rgba(250,243,232,0.8)',glow:'rgba(250,200,140,0.2)'},
+    {text:'愿它们飘向你  替我诉说',y:0.78,fs:Math.min(W*0.017,18),font:'Noto Serif SC',color:'rgba(250,243,232,0.55)',glow:'none'},
+    {text:'那些说不出口的喜欢',y:0.87,fs:Math.min(W*0.035,36),font:'Ma Shan Zheng',color:'#f0b8c8',glow:'rgba(240,184,200,0.4)'},
+  ],
+  [
+    {text:'💖 心跳星云',y:0.13,fs:Math.min(W*0.04,42),font:'Ma Shan Zheng',color:'#f0b8c8',glow:'rgba(240,150,180,0.5)'},
+    {text:'每一次心跳  都在呼唤你的名字',y:0.23,fs:Math.min(W*0.02,22),font:'Noto Serif SC',color:'rgba(250,243,232,0.8)',glow:'rgba(240,180,200,0.2)'},
+    {text:'你听见了吗',y:0.79,fs:Math.min(W*0.018,19),font:'Noto Serif SC',color:'rgba(250,243,232,0.55)',glow:'none'},
+    {text:'这颗心  为你而跳动',y:0.88,fs:Math.min(W*0.033,34),font:'Ma Shan Zheng',color:'#f5d7a7',glow:'rgba(249,209,112,0.4)'},
+  ],
+  [
+    {text:'✨ 流星雨',y:0.12,fs:Math.min(W*0.04,42),font:'Ma Shan Zheng',color:'#f5d7a7',glow:'rgba(249,209,112,0.55)'},
+    {text:'每颗流星划过  都是我在想你',y:0.21,fs:Math.min(W*0.021,23),font:'Noto Serif SC',color:'rgba(250,243,232,0.85)',glow:'rgba(250,200,150,0.25)'},
+    {text:'如果流星能实现愿望',y:0.77,fs:Math.min(W*0.017,18),font:'Noto Serif SC',color:'rgba(250,243,232,0.55)',glow:'none'},
+    {text:'我想和你在一起  永远',y:0.87,fs:Math.min(W*0.034,35),font:'Ma Shan Zheng',color:'#ffb3c6',glow:'rgba(255,160,190,0.5)'},
+  ],
+];
+
+function drawUI(ts){
+  ctxu.clearRect(0,0,W,H);
+  const T=ts*0.001;
+  const msg=messages[STATE.stage]||messages[0];
+  const fadeProgress=STATE.stageTransition;
+
+  for(const line of msg){
+    const elapsed=T-line.delay||(T-0.5);
+    // 简化：所有行统一淡入
+    const alpha=Math.min(1,Math.max(0,fadeProgress*2));
+    if(alpha<=0)continue;
+    ctxu.save();ctxu.font=`${line.fs}px "${line.font}","Noto Serif SC",cursive`;ctxu.textAlign='center';ctxu.textBaseline='middle';
+    if(line.glow!=='none'){ctxu.shadowColor=line.glow;ctxu.shadowBlur=18*alpha}
+    ctxu.globalAlpha=alpha;
+    ctxu.fillStyle=line.color;ctxu.fillText(line.text,W/2,H*line.y);
+    ctxu.restore();
+  }
+  requestAnimationFrame(drawUI);
+}
+requestAnimationFrame(drawUI);
+
+// ═══════════════════════════════════
+// ANIMATION LOOP
+// ═══════════════════════════════════
+const clock=new THREE.Clock();
+function animate(ts){
+  requestAnimationFrame(animate);
+  const dt=Math.min(clock.getDelta(),0.1);STATE.dt=dt;STATE.t=ts*0.001;
+
+  // 场景过渡
+  if(STATE.stage!==STATE.targetStage){
+    STATE.stageTransition=Math.max(0,STATE.stageTransition-dt*0.8);
+    if(STATE.stageTransition<=0.05){STATE.stage=STATE.targetStage;STATE.stageTransition=1}
+  }else{
+    STATE.stageTransition=Math.min(1,STATE.stageTransition+dt*0.8);
+  }
+
+  // ── 场景相关动画 ──
+  const s=STATE.stage;
+
+  // 星系旋转
+  galaxyGroup.rotation.y+=dt*0.06;
+  galaxyGroup.rotation.x=Math.sin(STATE.t*0.15)*0.08;
+  // 可见性
+  const galaxyAlpha=s===0?1:s===1?0.5:s===2?0.3:0.4;
+  galaxyGroup.children.forEach(c=>{if(c.material&&c.material.opacity!==undefined)c.material.opacity=galaxyAlpha* (c===coreGlow?0.9:0.7)});
+
+  // 心脏
+  heartGroup.rotation.y+=dt*0.3;
+  heartGroup.rotation.z=Math.sin(STATE.t*0.35)*0.06;
+  heartGroup.rotation.x=Math.cos(STATE.t*0.3)*0.04;
+  const beatScale=1+Math.abs(Math.sin(STATE.t*1.8))*0.03+Math.abs(Math.sin(STATE.t*3.7))*0.012;
+  const heartAlpha=s===2?1:s===0?0.65:s===3?0.5:0.3;
+  heartGroup.scale.setScalar(beatScale*(0.9+heartAlpha*0.2));
+  heartGroup.children.forEach(c=>{
+    if(c.material&&c.material.opacity!==undefined)c.material.opacity=heartAlpha*(c.userData?.axis?0.4:0.8);
+  });
+
+  // 天灯
+  const lanternAlpha=s===1?1:s===0?0.3:s===2?0.2:0.4;
+  lanternGroup.children.forEach(c=>{if(c.material)c.material.opacity=lanternAlpha*0.7});
+  for(const lp of lanternParticles){
+    lp.y+=lp.vy*dt;lp.x+=lp.vx*dt+Math.sin(STATE.t*1.5+lp.phase)*0.15*dt;
+    if(lp.y>14)lp.y=lp.baseY-6;
+    lp.mesh.position.set(lp.x,lp.y,lp.z);
+  }
+
+  // 流星生成频率随场景
+  const shootingStarChance=s===3?0.03:s===0?0.006:s===2?0.004:0.008;
+  if(Math.random()<shootingStarChance)spawnShootingStar();
+
+  // 更新流星
+  for(let i=shootingStars.length-1;i>=0;i--){
+    const ss=shootingStars[i];ss.life-=ss.decay;
+    ss.mesh.position.x+=ss.vel.x;ss.mesh.position.y+=ss.vel.y;
+    ss.mesh.material.opacity=ss.life;
+    if(ss.life<=0){scene.remove(ss.mesh);ss.mesh.geometry.dispose();ss.mesh.material.dispose();shootingStars.splice(i,1)}
+  }
+
+  // 星场
+  starfield.rotation.y+=dt*0.012;starfield.rotation.x+=dt*0.005;
+
+  // 星云
+  nebulae.forEach((n,i)=>n.rotation.y+=dt*(0.02+i*0.005));
+
+  // 更新爆发粒子
+  for(let i=bursts.length-1;i>=0;i--){
+    const b=bursts[i];b.life-=b.decay;
+    if(b.life<=0){scene.remove(b.points);b.points.geometry.dispose();b.points.material.dispose();bursts.splice(i,1);continue}
+    const pa=b.points.geometry.attributes.position.array;
+    for(let j=0;j<b.velocities.length;j++){pa[j*3]+=b.velocities[j].x;pa[j*3+1]+=b.velocities[j].y;pa[j*3+2]+=b.velocities[j].z;b.velocities[j].y-=0.00015}
+    b.points.geometry.attributes.position.needsUpdate=true;b.points.material.opacity=b.life*0.85;
+  }
+
+  // 3D 光标拖尾
+  if(mouseOnCanvas){
+    raycaster.setFromCamera(mouse,camera);
+    const pt=raycaster.ray.origin.clone().add(raycaster.ray.direction.clone().multiplyScalar(20));
+    cursorTrail.push({x:pt.x,y:pt.y,z:pt.z,life:1});
+  }
+  for(let i=cursorTrail.length-1;i>=0;i--){
+    cursorTrail[i].life-=0.025;
+    if(cursorTrail[i].life<=0){cursorTrail.splice(i,1);continue}
+  }
+  if(cursorTrail.length>maxTrail)cursorTrail.splice(0,cursorTrail.length-maxTrail);
+  for(let i=0;i<maxTrail;i++){
+    if(i<cursorTrail.length){
+      const ct=cursorTrail[i];trailPArr[i*3]=ct.x;trailPArr[i*3+1]=ct.y;trailPArr[i*3+2]=ct.z;
+      trailCArr[i*3]=1;trailCArr[i*3+1]=0.85;trailCArr[i*3+2]=0.6;
+    }else{trailPArr[i*3]=0;trailPArr[i*3+1]=-999;trailPArr[i*3+2]=0}
+  }
+  cursorTrailGeo.attributes.position.needsUpdate=true;
+  cursorTrailGeo.attributes.color.needsUpdate=true;
+  cursorTrailMesh.material.opacity=0.55;
+
+  // 相机
+  const camTargets=[
+    {x:0,y:1.2,z:30},{x:0,y:0.5,z:26},{x:0,y:1.8,z:20},{x:0,y:2,z:34}
+  ];
+  const ct=camTargets[s];
+  const baseTarget=new THREE.Vector3(ct.x,ct.y,ct.z);
+  const mouseOffset=new THREE.Vector3(mouse.x*3.5,mouse.y*2,0);
+  const desired=baseTarget.clone().add(mouseOffset);
+  camera.position.lerp(desired,0.025);
+  camera.lookAt(0,0.3,0);
+
+  composer.render();
+}
+resize3D();function resize3D(){W=innerWidth;H=innerHeight;renderer.setSize(W,H);composer.setSize(W,H);camera.aspect=W/H;camera.updateProjectionMatrix();rs2d();rsu()}
+window.addEventListener('resize',resize3D);
+requestAnimationFrame(animate);
+updateStageUI();
+console.log('%c💛 星河万里，不及你。%c\nFour scenes · Scroll to explore · Click to bloom · Space for wishes',
+  'font-size:1.3em;color:#f5d7a7;','color:#888;');
+</script>
+</body>
+</html>

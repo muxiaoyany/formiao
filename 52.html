@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>喵喵心动游戏厅 💘</title>
+    <title>喵喵心动游戏厅 💘 Cat's Heartbeat Arcade</title>
     <style>
         * {
             margin: 0;
@@ -18,61 +18,288 @@
             overflow: hidden;
             background-color: #FFF0F5;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        /* Game Container containing the canvas */
+        #arcadeWrapper {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, #FFE4E1 0%, #FFF0F5 100%);
         }
         #gameCanvas {
             display: block;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            box-shadow: 0 10px 30px rgba(214, 51, 132, 0.15);
+            box-shadow: 0 20px 50px rgba(214, 51, 132, 0.25);
+            border-radius: 16px;
             background: linear-gradient(180deg, #FFF0F5 0%, #FFE4E1 100%);
+            max-width: 100%;
+            max-height: 100%;
+        }
+        /* Hint overlay for first touch to enable Web Audio */
+        #audioPrompt {
+            position: absolute;
+            bottom: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 2px solid #FF69B4;
+            color: #D63384;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            pointer-events: none;
+            animation: bounce 2s infinite;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
         }
     </style>
 </head>
 <body>
 
-    <canvas id="gameCanvas"></canvas>
+    <div id="arcadeWrapper">
+        <canvas id="gameCanvas"></canvas>
+        <div id="audioPrompt">点击屏幕开启心动音乐/音效哦~ 😽</div>
+    </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        const audioPrompt = document.getElementById('audioPrompt');
 
-        // --- 核心配置与状态 ---
+        // --- Core Scaling Setup ---
         const DESIGN_WIDTH = 450;
         const DESIGN_HEIGHT = 800;
         let scale = 1;
-        
-        let gameState = 'MENU'; // MENU, GAME_1, GAME_2, GAME_3, GAME_4, GAME_5
+
+        // Game States: 'MENU', 'GAME_1', 'GAME_2', 'GAME_3', 'GAME_4', 'GAME_5'
+        let gameState = 'MENU';
         let pointer = { x: 0, y: 0, isDown: false, clicked: false };
         let particles = [];
         let globalTimer = 0;
 
-        // 统一配色
-        const COLORS = {
-            main: '#FFB6C1',   // 樱花粉
-            accent: '#FF69B4', // 玫红
-            gold: '#FFD700',   // 金色
-            bg: '#FFF0F5',     // 浅粉
-            text: '#D63384',   // 深玫红
-            white: '#FFFFFF',
-            gray: '#A9A9A9'
-        };
-
-        // --- 自定义告白文案 ---
+        // Custom Love Config (Editable Confession Copies)
         const COPIES = {
-            game1_success: "不管拆到哪个，答案都是我喜欢你 💓",
-            game2_success: "I ❤ U ! 始于好感陷于相处",
-            game3_success: "我对着星星许了愿：愿望是永远和你在一起 ✨",
-            game4_success: "别打了别打了！我投降！我喜欢你还不行吗！😂",
-            game5_success: "刮完就是我的人啦~ 😽"
+            game1_success: "不管你拆中哪一个神秘礼盒，喵喵的终极答案都永远只有这一个：我超级喜欢你！💓 一起开启甜蜜冒险吧！",
+            game2_success: "I ❤ U ! 所有的不期而遇，都是为了与你心动重逢。始于好感 陷于相处~ ✨",
+            game3_success: "我对着夜空许下了 52 个温柔的心愿。其实每一个愿望，全部都是关于你。愿我们岁岁年年永远都在一起 🌟",
+            game4_success: "别打了别打了！喵喵投降啦！🏳️ 这么准的命中率，一定是因为你也对我动了心吧！我喜欢你！😽",
+            game5_success: "恭喜你刮出喵喵的真心话！一旦刮开，就不许反悔啦 💗"
         };
 
-        // --- 按钮基类与公共组件 ---
+        // Visual Theme Settings
+        const COLORS = {
+            main: '#FFB6C1',     // Sakura Pink
+            accent: '#FF69B4',   // Rose Red
+            gold: '#FFD700',     // Gold Star
+            bgLight: '#FFF0F5',  // Lavendar Blush
+            text: '#D63384',     // Rich Deep Rose
+            white: '#FFFFFF',
+            darkPink: '#C71585',
+            skyDark: '#0D1B2A',  // Midnight starry sky
+            skyLight: '#1B263B',
+            mound: '#E0B0FF',
+            silver: '#D3D3D3'
+        };
+
+        // --- Sound Synthesizer (Web Audio API) ---
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioPrompt) audioPrompt.style.display = 'none';
+            }
+        }
+
+        // Procedural Sound Effects
+        const SOUNDS = {
+            click: () => {
+                if (!audioCtx) return;
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+            },
+            ding: () => {
+                if (!audioCtx) return;
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.45);
+            },
+            whack: () => {
+                if (!audioCtx) return;
+                let osc = audioCtx.createOscillator();
+                let gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.16);
+            },
+            success: () => {
+                if (!audioCtx) return;
+                // Play a cute happy 3-note arpeggio
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, index) => {
+                    let osc = audioCtx.createOscillator();
+                    let gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime + index * 0.1);
+                    gain.gain.setValueAtTime(0.15, audioCtx.currentTime + index * 0.1);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + index * 0.1 + 0.3);
+                    osc.start(audioCtx.currentTime + index * 0.1);
+                    osc.stop(audioCtx.currentTime + index * 0.1 + 0.35);
+                });
+            }
+        };
+
+        // --- Custom Drawing Helpers ---
+        function drawHeart(x, y, size, color, fill = true) {
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x, y + size / 4);
+            ctx.bezierCurveTo(x, y - size / 2, x - size, y - size / 2, x - size, y + size / 4);
+            ctx.bezierCurveTo(x - size, y + size * 0.8, x, y + size * 1.25, x, y + size * 1.4);
+            ctx.bezierCurveTo(x, y + size * 1.25, x + size, y + size * 0.8, x + size, y + size / 4);
+            ctx.bezierCurveTo(x + size, y - size / 2, x, y - size / 2, x, y + size / 4);
+            if (fill) ctx.fill();
+            else ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawLeftHeartHalf(x, y, size, color) {
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(x, y + size / 4);
+            ctx.bezierCurveTo(x, y - size / 2, x - size, y - size / 2, x - size, y + size / 4);
+            ctx.bezierCurveTo(x - size, y + size * 0.8, x, y + size * 1.25, x, y + size * 1.4);
+            ctx.lineTo(x, y + size / 4);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawRightHeartHalf(x, y, size, color) {
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(x, y + size / 4);
+            ctx.bezierCurveTo(x, y + size * 1.25, x + size, y + size * 0.8, x + size, y + size / 4);
+            ctx.bezierCurveTo(x + size, y - size / 2, x, y - size / 2, x, y + size / 4);
+            ctx.lineTo(x, y + size * 1.4);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawCatFace(x, y, scaleVal, mood = 'happy') {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(scaleVal, scaleVal);
+
+            // Ears
+            ctx.fillStyle = COLORS.main;
+            ctx.beginPath();
+            ctx.moveTo(-40, -10); ctx.lineTo(-55, -50); ctx.lineTo(-15, -30); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(40, -10); ctx.lineTo(55, -50); ctx.lineTo(15, -30); ctx.fill();
+
+            // Inner Ear Pink
+            ctx.fillStyle = COLORS.accent;
+            ctx.beginPath();
+            ctx.moveTo(-36, -13); ctx.lineTo(-48, -42); ctx.lineTo(-19, -26); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(36, -13); ctx.lineTo(48, -42); ctx.lineTo(19, -26); ctx.fill();
+
+            // Head
+            ctx.fillStyle = COLORS.white;
+            ctx.strokeStyle = COLORS.main;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 50, 42, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // Eyes
+            ctx.fillStyle = COLORS.text;
+            if (mood === 'happy') {
+                // Curved happy eyes
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = COLORS.text;
+                ctx.beginPath(); ctx.arc(-20, -5, 8, Math.PI, 0, false); ctx.stroke();
+                ctx.beginPath(); ctx.arc(20, -5, 8, Math.PI, 0, false); ctx.stroke();
+            } else if (mood === 'dizzy') {
+                ctx.strokeStyle = COLORS.text;
+                ctx.lineWidth = 3;
+                // Left X
+                ctx.beginPath(); ctx.moveTo(-25, -10); ctx.lineTo(-15, 0); ctx.moveTo(-15, -10); ctx.lineTo(-25, 0); ctx.stroke();
+                // Right X
+                ctx.beginPath(); ctx.moveTo(15, -10); ctx.lineTo(25, 0); ctx.moveTo(25, -10); ctx.lineTo(15, 0); ctx.stroke();
+            } else {
+                ctx.beginPath(); ctx.arc(-20, -5, 5, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath(); ctx.arc(20, -5, 5, 0, Math.PI*2); ctx.fill();
+            }
+
+            // Cheeks
+            ctx.fillStyle = 'rgba(255, 105, 180, 0.4)';
+            ctx.beginPath(); ctx.arc(-32, 8, 8, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(32, 8, 8, 0, Math.PI*2); ctx.fill();
+
+            // Nose
+            ctx.fillStyle = COLORS.accent;
+            ctx.beginPath();
+            ctx.moveTo(-4, 4); ctx.lineTo(4, 4); ctx.lineTo(0, 8);
+            ctx.closePath();
+            ctx.fill();
+
+            // Mouth
+            ctx.strokeStyle = COLORS.text;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            ctx.arc(-4, 10, 4, 0, Math.PI);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(4, 10, 4, 0, Math.PI);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // --- Custom Arcade Layout Button ---
         class Button {
-            constructor(x, y, w, h, text, callback, icon = '') {
+            constructor(x, y, w, h, text, callback, icon = '', themeColor = COLORS.accent) {
                 this.x = x; this.y = y; this.w = w; this.h = h;
                 this.text = text; this.callback = callback; this.icon = icon;
+                this.themeColor = themeColor;
                 this.baseScale = 1; this.currentScale = 1;
             }
             draw() {
@@ -80,21 +307,28 @@
                 ctx.translate(this.x + this.w/2, this.y + this.h/2);
                 ctx.scale(this.currentScale, this.currentScale);
                 
-                // 阴影
-                ctx.shadowColor = 'rgba(214, 51, 132, 0.2)';
-                ctx.shadowBlur = 8;
-                ctx.shadowOffsetY = 4;
+                // Shadow
+                ctx.shadowColor = 'rgba(214, 51, 132, 0.3)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetY = 6;
 
-                // 按钮主体
+                // Button Base (White inner with colored border)
                 ctx.fillStyle = COLORS.white;
-                ctx.strokeStyle = COLORS.accent;
-                ctx.lineWidth = 3;
+                ctx.strokeStyle = this.themeColor;
+                ctx.lineWidth = 4;
                 ctx.beginPath();
-                ctx.roundRect(-this.w/2, -this.h/2, this.w, this.h, 20);
+                ctx.roundRect(-this.w/2, -this.h/2, this.w, this.h, 22);
                 ctx.fill();
                 ctx.stroke();
 
-                // 文字
+                // Button Inner Rim Accent (adds design depth)
+                ctx.strokeStyle = 'rgba(255, 182, 193, 0.5)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(-this.w/2 + 4, -this.h/2 + 4, this.w - 8, this.h - 8, 18);
+                ctx.stroke();
+
+                // Text Formatting
                 ctx.shadowBlur = 0;
                 ctx.shadowOffsetY = 0;
                 ctx.fillStyle = COLORS.text;
@@ -105,15 +339,18 @@
                 ctx.fillText(displayText, 0, 0);
                 ctx.restore();
 
-                // 动效恢复
-                if (this.currentScale < this.baseScale) this.currentScale += 0.05;
+                // Smoothly restore scaling back to 1
+                if (this.currentScale < this.baseScale) {
+                    this.currentScale += 0.04;
+                }
             }
             checkClick() {
                 if (pointer.clicked && 
                     pointer.x >= this.x && pointer.x <= this.x + this.w &&
                     pointer.y >= this.y && pointer.y <= this.y + this.h) {
-                    this.currentScale = 0.85;
-                    createExplosion(this.x + this.w/2, this.y + this.h/2, COLORS.main, 10);
+                    this.currentScale = 0.8;
+                    SOUNDS.click();
+                    createExplosion(this.x + this.w/2, this.y + this.h/2, COLORS.main, 12);
                     this.callback();
                     return true;
                 }
@@ -121,20 +358,22 @@
             }
         }
 
-        // 常驻返回主页按钮
-        const homeBtn = new Button(30, 720, 140, 50, "返回主菜单", () => { changeState('MENU'); }, '🏠');
+        // Floating Back to Main Menu Button
+        const homeBtn = new Button(30, 725, 150, 48, "返回主菜单", () => { changeState('MENU'); }, '🏠', COLORS.accent);
 
-        // --- 粒子特效系统 ---
+        // --- Particle & Celebration Systems ---
         function createExplosion(x, y, color, count = 15) {
             for (let i = 0; i < count; i++) {
+                let angle = Math.random() * Math.PI * 2;
+                let speed = Math.random() * 6 + 2;
                 particles.push({
                     x: x, y: y,
-                    vx: (Math.random() - 0.5) * 8,
-                    vy: (Math.random() - 0.5) * 8,
+                    vx: Math.cos(angle) * speed,
+                    vy: Math.sin(angle) * speed - (Math.random() * 2), // upward bias
                     alpha: 1,
-                    size: Math.random() * 6 + 4,
+                    size: Math.random() * 8 + 4,
                     color: color,
-                    life: 1
+                    type: Math.random() > 0.4 ? 'spark' : 'heart'
                 });
             }
         }
@@ -144,74 +383,137 @@
                 let p = particles[i];
                 p.x += p.vx;
                 p.y += p.vy;
-                p.vy += 0.1; // 重力
-                p.alpha -= 0.02;
+                p.vy += 0.12; // gravity
+                p.alpha -= 0.025;
                 if (p.alpha <= 0) {
                     particles.splice(i, 1);
                 } else {
                     ctx.save();
                     ctx.globalAlpha = p.alpha;
-                    ctx.fillStyle = p.color;
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                    ctx.fill();
+                    if (p.type === 'heart') {
+                        drawHeart(p.x, p.y, p.size, p.color);
+                    } else {
+                        ctx.fillStyle = p.color;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
                     ctx.restore();
                 }
             }
         }
 
-        // --- 游戏 1：拆盲盒告白 🎁 ---
+        // --- GAME 1: 拆盲盒告白 🎁 ---
         let g1_boxes = [];
         let g1_targetIdx = 0;
         let g1_finished = false;
+        let g1_wiggleBox = null;
+
         function initGame1() {
-            g1_boxes = []; g1_finished = false;
+            g1_boxes = []; g1_finished = false; g1_wiggleBox = null;
             g1_targetIdx = Math.floor(Math.random() * 9);
-            let startX = 65, startY = 220, spacing = 110;
+            let startX = 65, startY = 200, spacing = 115;
             for(let i=0; i<9; i++) {
                 let row = Math.floor(i / 3);
                 let col = i % 3;
                 g1_boxes.push({
                     x: startX + col * spacing, y: startY + row * spacing,
-                    w: 90, h: 90, opened: false, text: "谢谢参与~"
+                    w: 90, h: 90, opened: false, scale: 1,
+                    wiggleTimer: 0, lidY: 0, revealY: 0
                 });
             }
-            g1_boxes[g1_targetIdx].text = "🎯 告白盒";
         }
+
         function drawGame1() {
             drawHeader("🎁 拆盲盒告白");
             let allOpened = g1_boxes.every(b => b.opened);
             
             g1_boxes.forEach((b, idx) => {
                 ctx.save();
+                
+                // Clicking logic on box
                 if (!b.opened) {
-                    ctx.fillStyle = COLORS.main;
-                    ctx.strokeStyle = COLORS.accent;
-                    ctx.lineWidth = 3;
-                    ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 15); ctx.fill(); ctx.stroke();
-                    ctx.fillStyle = COLORS.white;
-                    ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText('🎁', b.x + b.w/2, b.y + b.h/2);
-
                     if (pointer.clicked && pointer.x > b.x && pointer.x < b.x+b.w && pointer.y > b.y && pointer.y < b.y+b.h) {
                         b.opened = true;
-                        if (idx === g1_targetIdx || g1_boxes.filter(box=>box.opened).length === 9) {
+                        SOUNDS.whack();
+                        b.wiggleTimer = 15;
+                        if (idx === g1_targetIdx || g1_boxes.filter(box => box.opened).length === 9) {
                             g1_finished = true;
-                            createExplosion(b.x+b.w/2, b.y+b.h/2, COLORS.accent, 40);
+                            SOUNDS.success();
+                            createExplosion(b.x+b.w/2, b.y+b.h/2, COLORS.accent, 45);
                         } else {
                             createExplosion(b.x+b.w/2, b.y+b.h/2, COLORS.gold, 15);
                         }
                     }
+
+                    // Render gorgeous unopened Gift Box
+                    ctx.translate(b.x + b.w/2, b.y + b.h/2);
+                    if (b.wiggleTimer > 0) {
+                        ctx.rotate(Math.sin(b.wiggleTimer) * 0.15);
+                        b.wiggleTimer--;
+                    }
+                    
+                    // Box Shadow
+                    ctx.fillStyle = 'rgba(214, 51, 132, 0.15)';
+                    ctx.fillRect(-b.w/2 + 4, b.h/2 - 4, b.w, 8);
+
+                    // Box Body
+                    ctx.fillStyle = COLORS.main;
+                    ctx.strokeStyle = COLORS.accent;
+                    ctx.lineWidth = 3.5;
+                    ctx.beginPath();
+                    ctx.roundRect(-b.w/2, -b.h/2 + 10, b.w, b.h - 10, 10);
+                    ctx.fill(); ctx.stroke();
+
+                    // Box Lid
+                    ctx.fillStyle = COLORS.accent;
+                    ctx.beginPath();
+                    ctx.roundRect(-b.w/2 - 4, -b.h/2, b.w + 8, 15, 4);
+                    ctx.fill(); ctx.stroke();
+
+                    // Ribbon Cross
+                    ctx.fillStyle = COLORS.gold;
+                    ctx.fillRect(-8, -b.h/2, 16, b.h);
+                    ctx.fillRect(-b.w/2, -b.h/2 + 10, b.w, 12);
+
+                    // Ribbon Bow on top
+                    ctx.fillStyle = COLORS.gold;
+                    ctx.beginPath();
+                    ctx.ellipse(-12, -b.h/2 - 6, 12, 6, -Math.PI/6, 0, Math.PI*2);
+                    ctx.ellipse(12, -b.h/2 - 6, 12, 6, Math.PI/6, 0, Math.PI*2);
+                    ctx.fill();
+
                 } else {
-                    ctx.fillStyle = '#FFF';
-                    ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 15); ctx.fill();
-                    ctx.fillStyle = COLORS.text;
-                    ctx.font = '14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    // Box Opened Animation
+                    ctx.translate(b.x + b.w/2, b.y + b.h/2);
+                    
+                    // Draw base open box
+                    ctx.fillStyle = 'rgba(214, 51, 132, 0.05)';
+                    ctx.fillRect(-b.w/2, -b.h/2 + 20, b.w, b.h - 20);
+
+                    ctx.strokeStyle = COLORS.accent;
+                    ctx.lineWidth = 3.5;
+                    ctx.fillStyle = '#FFE4E1';
+                    ctx.beginPath();
+                    ctx.roundRect(-b.w/2, -b.h/2 + 20, b.w, b.h - 20, 8);
+                    ctx.fill(); ctx.stroke();
+
+                    // Pop up elements inside
                     if (idx === g1_targetIdx) {
-                        ctx.font = '30px sans-serif';
-                        ctx.fillText('💗', b.x + b.w/2, b.y + b.h/2);
+                        drawHeart(0, -10, 25, COLORS.accent);
                     } else {
-                        ctx.fillText('🍬 谢谢参与', b.x + b.w/2, b.y + b.h/2);
+                        // Candy decoration
+                        ctx.fillStyle = COLORS.gold;
+                        ctx.beginPath();
+                        ctx.arc(0, -10, 14, 0, Math.PI*2);
+                        ctx.fill();
+                        ctx.strokeStyle = COLORS.text;
+                        ctx.stroke();
+                        // Candy wraps
+                        ctx.beginPath();
+                        ctx.moveTo(-14, -10); ctx.lineTo(-24, -18); ctx.lineTo(-24, -2); ctx.closePath();
+                        ctx.moveTo(14, -10); ctx.lineTo(24, -18); ctx.lineTo(24, -2); ctx.closePath();
+                        ctx.fillStyle = COLORS.gold; ctx.fill(); ctx.stroke();
                     }
                 }
                 ctx.restore();
@@ -222,326 +524,693 @@
             }
         }
 
-        // --- 游戏 2：心动连连看 🔗 ---
+        // --- GAME 2: 心动连连看 🔗 ---
         let g2_hearts = [];
         let g2_selected = null;
         let g2_successCount = 0;
         let g2_finished = false;
-        const g2_colors = ['#FF69B4', '#FFD700', '#FF1493', '#00FFFF', '#FF4500', '#9370DB'];
+        let g2_pulseScale = 1;
+        const g2_colors = ['#FF69B4', '#FFD700', '#FF1493', '#9370DB', '#FF4500', '#00FA9A'];
+
         function initGame2() {
             g2_hearts = []; g2_selected = null; g2_successCount = 0; g2_finished = false;
-            // 生成6对颜色不同的左右心
+            // Generate matching pairs (6 left half, 6 right half hearts)
             for (let i = 0; i < 6; i++) {
-                g2_hearts.push({ id: i, side: 'left', color: g2_colors[i], x: Math.random()*120 + 40, y: 180 + i * 75, targetX: 0, targetY: 0, matched: false });
-                g2_hearts.push({ id: i, side: 'right', color: g2_colors[i], x: Math.random()*120 + 260, y: 180 + i * 75, targetX: 0, targetY: 0, matched: false });
+                // Dispersed locations (Lefts on left zone, rights on right zone)
+                g2_hearts.push({
+                    id: i, side: 'left', color: g2_colors[i],
+                    x: 70 + Math.random() * 100, y: 160 + i * 85,
+                    targetX: 0, targetY: 0, matched: false, scale: 1
+                });
+                g2_hearts.push({
+                    id: i, side: 'right', color: g2_colors[i],
+                    x: 280 + Math.random() * 100, y: 160 + i * 85,
+                    targetX: 0, targetY: 0, matched: false, scale: 1
+                });
             }
         }
+
         function drawGame2() {
             drawHeader("🔗 心动连连看");
-            
-            // 绘制连线/拖拽线
+
+            // Heart pulse scaling
+            g2_pulseScale = 1 + Math.sin(globalTimer / 8) * 0.05;
+
+            // Connecting indicator line
             if (pointer.isDown && g2_selected) {
+                ctx.save();
                 ctx.strokeStyle = g2_selected.color;
                 ctx.lineWidth = 4;
-                ctx.setLineDash([5, 5]);
+                ctx.setLineDash([8, 6]);
+                ctx.shadowColor = g2_selected.color;
+                ctx.shadowBlur = 8;
                 ctx.beginPath();
                 ctx.moveTo(g2_selected.x, g2_selected.y);
                 ctx.lineTo(pointer.x, pointer.y);
                 ctx.stroke();
-                ctx.setLineDash([]);
+                ctx.restore();
             }
 
             g2_hearts.forEach(h => {
+                ctx.save();
                 if (h.matched) {
-                    ctx.fillStyle = h.color;
-                    ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                    ctx.fillText('💗', h.x, h.y);
-                    return;
-                }
+                    // Assemble perfect hearts bouncing together
+                    drawHeart(h.x, h.y, 25 * g2_pulseScale, h.color);
+                    // Match Success particle glows
+                    if (globalTimer % 30 === 0) {
+                        createExplosion(h.x, h.y, h.color, 1);
+                    }
+                } else {
+                    // Hover/Select Scale effect
+                    let isHovered = Math.hypot(pointer.x - h.x, pointer.y - h.y) < 30;
+                    let targetScale = isHovered ? 1.25 : 1.0;
+                    h.scale += (targetScale - h.scale) * 0.15;
 
-                ctx.fillStyle = h.color;
-                ctx.font = '36px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-                ctx.fillText(h.side === 'left' ? '♥' : '♥', h.x, h.y); // Canvas 简单渲染半边可以使用切片或纯色心代表
+                    ctx.translate(h.x, h.y);
+                    ctx.scale(h.scale, h.scale);
 
-                if (pointer.clicked && Math.hypot(pointer.x - h.x, pointer.y - h.y) < 25) {
-                    if (h.side === 'left') g2_selected = h;
+                    if (h.side === 'left') {
+                        drawLeftHeartHalf(0, -15, 20, h.color);
+                    } else {
+                        drawRightHeartHalf(0, -15, 20, h.color);
+                    }
+
+                    // Pulse anchor rings
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                    ctx.stroke();
+
+                    if (pointer.clicked && Math.hypot(pointer.x - h.x, pointer.y - h.y) < 30) {
+                        g2_selected = h;
+                        SOUNDS.click();
+                    }
                 }
+                ctx.restore();
             });
 
+            // Match checking on release
             if (!pointer.isDown && g2_selected) {
-                let target = g2_hearts.find(h => h.side === 'right' && !h.matched && Math.hypot(pointer.x - h.x, pointer.y - h.y) < 35);
+                let otherSide = g2_selected.side === 'left' ? 'right' : 'left';
+                let target = g2_hearts.find(h => h.side === otherSide && !h.matched && Math.hypot(pointer.x - h.x, pointer.y - h.y) < 40);
+                
                 if (target && target.id === g2_selected.id) {
                     g2_selected.matched = true;
                     target.matched = true;
+                    // Move them towards each other to form a unified center
+                    let midX = (g2_selected.x + target.x) / 2;
+                    let midY = (g2_selected.y + target.y) / 2;
+                    g2_selected.x = target.x = midX;
+                    g2_selected.y = target.y = midY;
                     g2_successCount++;
-                    createExplosion(target.x, target.y, g2_selected.color, 15);
-                    if (g2_successCount === 6) g2_finished = true;
+                    SOUNDS.ding();
+                    createExplosion(midX, midY, g2_selected.color, 25);
+                    if (g2_successCount === 6) {
+                        g2_finished = true;
+                        SOUNDS.success();
+                    }
+                } else if (target && target.id !== g2_selected.id) {
+                    // Wrong match feedback
+                    createExplosion(pointer.x, pointer.y, '#808080', 5);
                 }
                 g2_selected = null;
             }
 
+            // Beautiful Love Pattern Layout upon Complete
             if (g2_finished) {
+                // Align them automatically in an I Heart U grid shape
+                const layout = [
+                    {x: 225, y: 380}, // Main center
+                    {x: 165, y: 310}, // Top Left
+                    {x: 285, y: 310}, // Top Right
+                    {x: 145, y: 380}, // Mid Left
+                    {x: 305, y: 380}, // Mid Right
+                    {x: 225, y: 460}  // Bottom Point
+                ];
+                g2_hearts.forEach((h, idx) => {
+                    let targetPos = layout[idx % layout.length];
+                    h.x += (targetPos.x - h.x) * 0.08;
+                    h.y += (targetPos.y - h.y) * 0.08;
+                });
                 drawPopWindow(COPIES.game2_success);
             }
         }
 
-        // --- 游戏 3：星空许愿瓶 🌟 ---
+        // --- GAME 3: 星空许愿瓶 🌟 ---
         let g3_stars = [];
-        let g3_bottle = { x: 225, y: 500, r: 80 };
+        let g3_bottle = { x: 225, y: 480, r: 85 };
         let g3_collected = 0;
         let g3_target = 52;
+        let g3_starsCreated = 0;
+
         function initGame3() {
-            g3_stars = []; g3_collected = 0;
-            for(let i=0; i<30; i++) {
-                g3_stars.push({ x: Math.random()*380+30, y: Math.random()*250+150, r: Math.random()*6+4, speed: Math.random()*1+0.5, isDraggable: true });
+            g3_stars = []; g3_collected = 0; g3_starsCreated = 0;
+            // Spawn initial flowing stars
+            for (let i = 0; i < 20; i++) {
+                spawnG3Star(true);
             }
         }
+
+        function spawnG3Star(initRandomY = false) {
+            g3_stars.push({
+                id: g3_starsCreated++,
+                x: Math.random() * 380 + 35,
+                y: initRandomY ? Math.random() * 200 + 130 : 130,
+                r: Math.random() * 6 + 4,
+                speed: Math.random() * 1.5 + 0.8,
+                inBottle: false,
+                isDraggable: true,
+                pulse: Math.random() * Math.PI,
+                vx: 0, vy: 0
+            });
+        }
+
         function drawGame3() {
-            drawHeader("🌟 星空许愿瓶");
+            // Draw Starry night background inside canvas boundary
+            ctx.save();
+            let skyGrad = ctx.createLinearGradient(0, 0, 0, DESIGN_HEIGHT);
+            skyGrad.addColorStop(0, COLORS.skyDark);
+            skyGrad.addColorStop(1, COLORS.skyLight);
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
+            ctx.restore();
 
-            // 绘制许愿瓶
-            ctx.strokeStyle = COLORS.accent;
-            ctx.lineWidth = 5;
-            ctx.fillStyle = `rgba(255, 182, 193, ${0.1 + (g3_collected/g3_target)*0.4})`;
-            ctx.beginPath();
-            ctx.arc(g3_bottle.x, g3_bottle.y, g3_bottle.r, 0, Math.PI, false);
-            ctx.lineTo(g3_bottle.x + g3_bottle.r - 20, g3_bottle.y - 100);
-            ctx.lineTo(g3_bottle.x - g3_bottle.r + 20, g3_bottle.y - 100);
-            ctx.closePath();
-            ctx.fill(); ctx.stroke();
-            
-            // 瓶盖
-            ctx.fillStyle = COLORS.accent;
-            ctx.fillRect(g3_bottle.x - 30, g3_bottle.y - 110, 60, 15);
+            drawHeader("🌟 星空许愿瓶", COLORS.white, 'rgba(255,255,255,0.15)');
 
-            // 进度条
-            ctx.fillStyle = COLORS.text;
-            ctx.font = '20px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText(`⭐ 进度: ${g3_collected} / ${g3_target}`, 225, 380);
-
-            // 更新与绘制星星
-            g3_stars.forEach((s, idx) => {
-                ctx.fillStyle = COLORS.gold;
-                ctx.shadowColor = COLORS.gold; ctx.shadowBlur = 10;
+            // Starry Constellation Twinkle Background Elements
+            for (let i = 0; i < 15; i++) {
+                ctx.fillStyle = `rgba(255,255,255, ${0.2 + Math.sin(globalTimer/15 + i)*0.25})`;
                 ctx.beginPath();
-                ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+                ctx.arc(45 + (i * 28) % 360, 180 + (i * 45) % 200, 2, 0, Math.PI*2);
                 ctx.fill();
-                ctx.shadowBlur = 0;
+            }
 
+            // Draw Glass Wishing Bottle (Arcade-Styled Vector art)
+            ctx.save();
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = COLORS.main;
+            
+            // Outer glowing bottle shape
+            ctx.strokeStyle = COLORS.white;
+            ctx.lineWidth = 5;
+            // Bottle Fill intensity based on collected stars
+            let bottleAlpha = 0.05 + (g3_collected / g3_target) * 0.35;
+            ctx.fillStyle = `rgba(255, 182, 193, ${bottleAlpha})`;
+
+            ctx.beginPath();
+            // Start mouth left
+            ctx.moveTo(g3_bottle.x - 30, g3_bottle.y - 120);
+            ctx.lineTo(g3_bottle.x - 30, g3_bottle.y - 100);
+            // Shoulder Left
+            ctx.bezierCurveTo(g3_bottle.x - 75, g3_bottle.y - 80, g3_bottle.x - g3_bottle.r, g3_bottle.y - 40, g3_bottle.x - g3_bottle.r, g3_bottle.y);
+            // Base
+            ctx.arcTo(g3_bottle.x - g3_bottle.r, g3_bottle.y + g3_bottle.r, g3_bottle.x + g3_bottle.r, g3_bottle.y + g3_bottle.r, 20);
+            ctx.arcTo(g3_bottle.x + g3_bottle.r, g3_bottle.y + g3_bottle.r, g3_bottle.x + g3_bottle.r, g3_bottle.y - 40, 20);
+            // Shoulder Right
+            ctx.bezierCurveTo(g3_bottle.x + g3_bottle.r, g3_bottle.y - 40, g3_bottle.x + 75, g3_bottle.y - 80, g3_bottle.x + 30, g3_bottle.y - 100);
+            ctx.lineTo(g3_bottle.x + 30, g3_bottle.y - 120);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Glass Highlights
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.ellipse(g3_bottle.x - g3_bottle.r + 15, g3_bottle.y + 10, 60, 45, Math.PI/3, 0.2, Math.PI, false);
+            ctx.stroke();
+
+            // Cork Cap
+            ctx.fillStyle = '#CD853F'; // Cork Tan
+            ctx.beginPath();
+            ctx.roundRect(g3_bottle.x - 27, g3_bottle.y - 132, 54, 14, 3);
+            ctx.fill();
+            ctx.restore();
+
+            // Draw & Update falling/collected stars
+            g3_stars.forEach((s, idx) => {
+                ctx.save();
+                
+                // Pulsate Twinkle Effect
+                s.pulse += 0.05;
+                let scalePulse = s.r * (1 + Math.sin(s.pulse) * 0.2);
+
+                ctx.fillStyle = COLORS.gold;
+                ctx.shadowColor = COLORS.gold;
+                ctx.shadowBlur = 10 + Math.sin(s.pulse) * 4;
+
+                ctx.beginPath();
+                // Standard cute 5-point star rendering
+                let cx = s.x, cy = s.y;
+                let spikes = 5, outerRadius = scalePulse, innerRadius = scalePulse / 2.2;
+                let rot = Math.PI / 2 * 3;
+                let x = cx, y = cy;
+                let step = Math.PI / spikes;
+
+                ctx.moveTo(cx, cy - outerRadius);
+                for (let i = 0; i < spikes; i++) {
+                    x = cx + Math.cos(rot) * outerRadius;
+                    y = cy + Math.sin(rot) * outerRadius;
+                    ctx.lineTo(x, y);
+                    rot += step;
+
+                    x = cx + Math.cos(rot) * innerRadius;
+                    y = cy + Math.sin(rot) * innerRadius;
+                    ctx.lineTo(x, y);
+                    rot += step;
+                }
+                ctx.lineTo(cx, cy - outerRadius);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+
+                // Physics logic
                 if (!s.inBottle) {
                     s.y += s.speed;
-                    if (s.y > 350 && s.isDraggable) s.y = 120; // 顶部循环下落
-
-                    // 拖拽逻辑
-                    if (pointer.isDown && Math.hypot(pointer.x - s.x, pointer.y - s.y) < 25) {
+                    // Drag logic
+                    if (pointer.isDown && Math.hypot(pointer.x - s.x, pointer.y - s.y) < 26) {
                         s.x = pointer.x; s.y = pointer.y;
+                        s.speed = 0;
+                    } else if (s.speed === 0) {
+                        s.speed = Math.random() * 1.5 + 0.8;
                     }
-                    
-                    // 检测是否进瓶
-                    if (!pointer.isDown && s.y > g3_bottle.y - 80 && Math.hypot(s.x - g3_bottle.x, s.y - g3_bottle.y) < g3_bottle.r) {
+
+                    // Recycle falling star if offscreen
+                    if (s.y > 400 && s.isDraggable) {
+                        s.y = 120;
+                        s.x = Math.random() * 380 + 35;
+                    }
+
+                    // Check if dragged/dropped into bottle neck opening
+                    let isCloseToOpening = (s.x > g3_bottle.x - 35 && s.x < g3_bottle.x + 35 && Math.abs(s.y - (g3_bottle.y - 110)) < 25);
+                    let isInsideBottom = (s.y > g3_bottle.y - 50 && Math.hypot(s.x - g3_bottle.x, s.y - g3_bottle.y) < g3_bottle.r - 8);
+
+                    if (isCloseToOpening || isInsideBottom) {
                         s.inBottle = true;
                         s.isDraggable = false;
-                        g3_collected = Math.min(g3_target, g3_collected + 2); // 每次加两颗，加速体验
-                        createExplosion(s.x, s.y, COLORS.gold, 5);
+                        g3_collected = Math.min(g3_target, g3_collected + 1);
+                        SOUNDS.ding();
+                        createExplosion(s.x, s.y, COLORS.gold, 8);
+                        // Spawn replacement star to maintain continuous gameplay stream
+                        spawnG3Star();
                     }
                 } else {
-                    // 瓶内轻轻晃动
-                    s.x += Math.sin(globalTimer/10 + idx)*0.3;
-                    s.y += Math.cos(globalTimer/10 + idx)*0.3;
+                    // Containment Physics inside the rounded bottle
+                    let targetX = g3_bottle.x + Math.sin(idx * 2.5 + globalTimer / 30) * (g3_bottle.r - 20);
+                    let targetY = g3_bottle.y + g3_bottle.r - 30 - ((idx % 7) * 12) + Math.cos(idx + globalTimer / 20) * 4;
+                    
+                    s.x += (targetX - s.x) * 0.12;
+                    s.y += (targetY - s.y) * 0.12;
                 }
             });
+
+            // Target Progress Tracker Banner
+            ctx.fillStyle = COLORS.white;
+            ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+            ctx.shadowBlur = 4; ctx.shadowColor = 'rgba(0,0,0,0.5)';
+            ctx.fillText(`✨ 许愿心愿星: ${g3_collected} / ${g3_target} ✨`, 225, 360);
+            ctx.shadowBlur = 0;
 
             if (g3_collected >= g3_target) {
                 drawPopWindow(COPIES.game3_success);
             }
         }
 
-        // --- 游戏 4：打地鼠告白 🎮 ---
+        // --- GAME 4: 打地鼠告白 🎮 ---
         let g4_holes = [];
         let g4_score = 0;
         let g4_targetScore = 99;
         let g4_spawnTimer = 0;
+        let g4_whackFeedback = []; // array of floating indicator scores
+
         function initGame4() {
-            g4_score = 0; g4_holes = [];
-            let startX = 85, startY = 240, spacing = 140;
+            g4_score = 0; g4_holes = []; g4_whackFeedback = [];
+            let startX = 85, startY = 220, spacing = 140;
             for(let i=0; i<9; i++) {
                 g4_holes.push({
                     x: startX + (i%3)*spacing, y: startY + Math.floor(i/3)*spacing,
-                    type: 'none', timer: 0, hit: false
+                    type: 'none', timer: 0, maxTimer: 0, hit: false, popProgress: 0
                 });
             }
         }
+
         function drawGame4() {
             drawHeader("🎮 打地鼠告白");
 
-            // 计分板
+            // Heartbeat target score HUD
             ctx.fillStyle = COLORS.text;
             ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText(`💓 心动积分: ${g4_score} / ${g4_targetScore}`, 225, 150);
+            ctx.fillText(`💓 告白进度值: ${g4_score} / ${g4_targetScore}`, 225, 145);
 
+            // Progressive game level spawn logic
             g4_spawnTimer++;
-            if (g4_spawnTimer > 40 && g4_score < g4_targetScore) {
+            if (g4_spawnTimer > 35 && g4_score < g4_targetScore) {
                 g4_spawnTimer = 0;
-                let activeHoles = g4_holes.filter(h => h.type === 'none');
-                if (activeHoles.length > 0) {
-                    let h = activeHoles[Math.floor(Math.random()*activeHoles.length)];
+                let inactiveHoles = g4_holes.filter(h => h.type === 'none');
+                if (inactiveHoles.length > 0) {
+                    let h = inactiveHoles[Math.floor(Math.random() * inactiveHoles.length)];
                     let rand = Math.random();
-                    h.type = rand < 0.5 ? 'normal' : (rand < 0.8 ? 'cat' : 'heart');
-                    h.timer = 60 + Math.random()*40;
+                    h.type = rand < 0.45 ? 'normal' : (rand < 0.75 ? 'cat' : 'heart');
+                    h.timer = h.maxTimer = 65 + Math.random() * 40;
                     h.hit = false;
+                    h.popProgress = 0;
                 }
             }
 
-            g4_holes.forEach(h => {
-                // 画地洞
+            // Draw holes and cute pop-up targets
+            g4_holes.forEach((h, idx) => {
+                // Ground mound/hole base
+                ctx.save();
                 ctx.fillStyle = '#D2B48C';
-                ctx.beginPath(); ctx.ellipse(h.x, h.y+30, 40, 15, 0, 0, Math.PI*2); ctx.fill();
+                ctx.beginPath();
+                ctx.ellipse(h.x, h.y + 35, 45, 16, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#8B4513';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.ellipse(h.x, h.y + 35, 40, 12, 0, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.restore();
 
                 if (h.type !== 'none' && h.timer > 0) {
                     h.timer--;
-                    ctx.save();
-                    let emoji = h.type === 'normal' ? '🐹' : (h.type === 'cat' ? '😺' : '💗');
-                    ctx.font = '45px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     
-                    if (h.hit) ctx.globalAlpha = 0.5;
-                    ctx.fillText(emoji, h.x, h.y);
+                    // pop up/down animation scaling
+                    if (h.timer > h.maxTimer - 10) {
+                        h.popProgress += 0.1; // pop up
+                    } else if (h.timer < 10) {
+                        h.popProgress -= 0.1; // slide down
+                    } else {
+                        h.popProgress = 1; // stay
+                    }
+                    h.popProgress = Math.max(0, Math.min(1, h.popProgress));
+
+                    ctx.save();
+                    // Clip the mole to the hole boundary so it pops up out of the hole
+                    ctx.beginPath();
+                    ctx.rect(h.x - 55, h.y - 70, 110, 105);
+                    ctx.clip();
+
+                    ctx.translate(h.x, h.y + 35 - (55 * h.popProgress));
+
+                    if (h.type === 'normal') {
+                        // Custom hand-drawn cute mole
+                        ctx.fillStyle = '#D2691E';
+                        ctx.beginPath(); ctx.ellipse(0, 5, 26, 32, 0, 0, Math.PI*2); ctx.fill();
+                        // Nose snout
+                        ctx.fillStyle = '#FFE4C4';
+                        ctx.beginPath(); ctx.ellipse(0, 14, 15, 12, 0, 0, Math.PI*2); ctx.fill();
+                        ctx.fillStyle = '#000';
+                        ctx.beginPath(); ctx.arc(0, 8, 4, 0, Math.PI*2); ctx.fill();
+                        // Eyes
+                        ctx.fillStyle = '#000';
+                        if (h.hit) {
+                            ctx.font = 'bold 16px Arial'; ctx.textAlign='center';
+                            ctx.fillText('X', -8, -2); ctx.fillText('X', 8, -2);
+                        } else {
+                            ctx.beginPath(); ctx.arc(-10, -5, 3, 0, Math.PI*2); ctx.fill();
+                            ctx.beginPath(); ctx.arc(10, -5, 3, 0, Math.PI*2); ctx.fill();
+                        }
+                    } else if (h.type === 'cat') {
+                        // Drawing vector style cat face
+                        drawCatFace(0, 5, 0.55, h.hit ? 'dizzy' : 'happy');
+                    } else if (h.type === 'heart') {
+                        // Gold heart character
+                        drawHeart(0, -10, 22, COLORS.gold);
+                        if (!h.hit) {
+                            // Smiling face on golden heart
+                            ctx.strokeStyle = COLORS.text; ctx.lineWidth = 2;
+                            ctx.beginPath(); ctx.arc(-7, -10, 3, 0, Math.PI); ctx.stroke();
+                            ctx.beginPath(); ctx.arc(7, -10, 3, 0, Math.PI); ctx.stroke();
+                        }
+                    }
                     ctx.restore();
 
-                    // 点击判定
-                    if (pointer.clicked && !h.hit && Math.hypot(pointer.x - h.x, pointer.y - h.y) < 35) {
+                    // Collision whacking check
+                    if (pointer.clicked && !h.hit && Math.hypot(pointer.x - h.x, pointer.y - h.y) < 42) {
                         h.hit = true;
+                        SOUNDS.whack();
                         let points = h.type === 'normal' ? 5 : (h.type === 'cat' ? 10 : 20);
                         g4_score = Math.min(g4_targetScore, g4_score + points);
-                        createExplosion(h.x, h.y, COLORS.accent, 15);
+                        
+                        // Spawn float reward texts
+                        g4_whackFeedback.push({
+                            x: h.x, y: h.y - 10, text: `+${points} 心动!`, alpha: 1
+                        });
+                        createExplosion(h.x, h.y, h.type === 'heart' ? COLORS.gold : COLORS.accent, 15);
                     }
                 } else {
                     h.type = 'none';
                 }
             });
 
+            // Update floating whack values
+            g4_whackFeedback.forEach((fb, fidx) => {
+                fb.y -= 1.5;
+                fb.alpha -= 0.02;
+                ctx.save();
+                ctx.globalAlpha = fb.alpha;
+                ctx.fillStyle = COLORS.text;
+                ctx.font = 'bold 18px Arial'; ctx.textAlign = 'center';
+                ctx.fillText(fb.text, fb.x, fb.y);
+                ctx.restore();
+                if (fb.alpha <= 0) g4_whackFeedback.splice(fidx, 1);
+            });
+
+            // Confession trigger condition
             if (g4_score >= g4_targetScore) {
+                // End state: Make all holes erupt floating sweet hearts
+                g4_holes.forEach(h => {
+                    h.type = 'heart'; h.hit = true; h.popProgress = 1;
+                });
                 drawPopWindow(COPIES.game4_success);
             }
         }
 
-        // --- 游戏 5：刮刮乐告白 🎨 ---
+        // --- GAME 5: 刮刮乐告白 🎨 ---
         let g5_canvas, g5_ctx;
         let g5_scratchedPercent = 0;
-        let g5_w = 340, g5_h = 200, g5_x = 55, g5_y = 250;
+        let g5_w = 340, g5_h = 240, g5_x = 55, g5_y = 230;
+
         function initGame5() {
             g5_scratchedPercent = 0;
-            // 离屏Canvas处理刮刮乐涂层
+            // High fidelity scratch overlay canvas
             g5_canvas = document.createElement('canvas');
             g5_canvas.width = g5_w; g5_canvas.height = g5_h;
             g5_ctx = g5_canvas.getContext('2d');
             
-            // 填充银色涂层
-            g5_ctx.fillStyle = '#C0C0C0';
+            // Draw scratch card cover (Shimmering Silver Gradient)
+            let silverGrad = g5_ctx.createLinearGradient(0, 0, g5_w, g5_h);
+            silverGrad.addColorStop(0, '#E6E6FA'); // Lavender Silver
+            silverGrad.addColorStop(0.5, '#C0C0C0');
+            silverGrad.addColorStop(1, '#A9A9A9');
+            g5_ctx.fillStyle = silverGrad;
             g5_ctx.fillRect(0, 0, g5_w, g5_h);
-            g5_ctx.fillStyle = '#999';
-            g5_ctx.font = 'bold 20px sans-serif'; g5_ctx.textAlign = 'center'; g5_ctx.textBaseline = 'middle';
-            g5_ctx.fillText('✨ 刮开图层解锁心动 ✨', g5_w/2, g5_h/2);
+            
+            // Add grid/sparkly texture to silver overlay
+            g5_ctx.fillStyle = 'rgba(255,255,255,0.15)';
+            for (let i = 0; i < g5_w; i += 10) {
+                g5_ctx.fillRect(i, 0, 1, g5_h);
+            }
+            for (let j = 0; j < g5_h; j += 10) {
+                g5_ctx.fillRect(0, j, g5_w, 1);
+            }
+
+            // Decorative prompt on silver
+            g5_ctx.fillStyle = COLORS.text;
+            g5_ctx.font = 'bold 20px sans-serif';
+            g5_ctx.textAlign = 'center';
+            g5_ctx.textBaseline = 'middle';
+            g5_ctx.fillText('✨ 刮开图层解锁心动告白 ✨', g5_w/2, g5_h/2);
+            g5_ctx.font = '14px sans-serif';
+            g5_ctx.fillStyle = 'rgba(214, 51, 132, 0.7)';
+            g5_ctx.fillText('🐱 滑动/擦拭涂层 🐱', g5_w/2, g5_h/2 + 35);
         }
+
+        // Pixel-accurate check of scratch percentage
+        function calculateG5Scratched() {
+            try {
+                let imgData = g5_ctx.getImageData(0, 0, g5_w, g5_h);
+                let pixels = imgData.data;
+                let transparentCount = 0;
+                let step = 16; // Skip pixels for speedy real-time calculation
+                let totalChecked = 0;
+
+                for (let i = 3; i < pixels.length; i += 4 * step) {
+                    totalChecked++;
+                    if (pixels[i] === 0) {
+                        transparentCount++;
+                    }
+                }
+                return (transparentCount / totalChecked) * 100;
+            } catch (e) {
+                // Fallback estimate if security exceptions occur
+                return g5_scratchedPercent;
+            }
+        }
+
         function drawGame5() {
             drawHeader("🎨 刮刮乐告白");
 
-            // 1. 绘制底层告白结果
+            // 1. Draw Confidential Love Letter Underneath
+            ctx.save();
             ctx.fillStyle = COLORS.white;
-            ctx.beginPath(); ctx.roundRect(g5_x, g5_y, g5_w, g5_h, 15); ctx.fill();
-            
-            ctx.fillStyle = COLORS.text;
-            ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText("✨ 终极大奖 ✨", g5_x + g5_w/2, g5_y + 60);
-            ctx.font = '18px sans-serif';
-            ctx.fillText(COPIES.game5_success, g5_x + g5_w/2, g5_y + 120);
+            ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(0,0,0,0.1)';
+            ctx.beginPath();
+            ctx.roundRect(g5_x, g5_y, g5_w, g5_h, 16);
+            ctx.fill();
+            ctx.restore();
 
-            // 2. 刮擦交互
-            if (pointer.isDown && pointer.x > g5_x && pointer.x < g5_x+g5_w && pointer.y > g5_y && pointer.y < g5_y+g5_h) {
+            // Decorative gold border
+            ctx.strokeStyle = COLORS.gold;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.roundRect(g5_x + 8, g5_y + 8, g5_w - 16, g5_h - 16, 12);
+            ctx.stroke();
+
+            // Hidden message details
+            ctx.fillStyle = COLORS.text;
+            ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText("💌 专属告白信 💌", g5_x + g5_w/2, g5_y + 50);
+
+            // Confession hint revealed step-by-step
+            ctx.font = '16px sans-serif';
+            if (g5_scratchedPercent < 30) {
+                ctx.fillText("努力刮开解锁我的秘密.. 💓", g5_x + g5_w/2, g5_y + 115);
+            } else if (g5_scratchedPercent < 65) {
+                ctx.fillText("..我 喜 欢 你.. ✨", g5_x + g5_w/2, g5_y + 115);
+            } else {
+                wrapText(ctx, COPIES.game5_success, g5_x + g5_w/2, g5_y + 105, g5_w - 40, 26);
+                drawCatFace(g5_x + g5_w/2, g5_y + 195, 0.4, 'happy');
+            }
+
+            // 2. Erase / Scratch Action
+            if (pointer.isDown && pointer.x > g5_x && pointer.x < g5_x + g5_w && pointer.y > g5_y && pointer.y < g5_y + g5_h) {
                 g5_ctx.save();
                 g5_ctx.globalCompositeOperation = 'destination-out';
                 g5_ctx.beginPath();
-                g5_ctx.arc(pointer.x - g5_x, pointer.y - g5_y, 25, 0, Math.PI*2);
+                g5_ctx.arc(pointer.x - g5_x, pointer.y - g5_y, 22, 0, Math.PI * 2);
                 g5_ctx.fill();
                 g5_ctx.restore();
                 
-                // 缓慢增加进度计算（单文件纯前端简化版计数）
-                if(g5_scratchedPercent < 100) g5_scratchedPercent += 0.5;
+                // Keep percentage calculations lightweight
+                if (globalTimer % 4 === 0) {
+                    g5_scratchedPercent = calculateG5Scratched();
+                    if (g5_scratchedPercent > 10 && g5_scratchedPercent % 15 === 0) {
+                        SOUNDS.click();
+                    }
+                }
             }
 
-            // 3. 绘制覆盖涂层
-            if (g5_scratchedPercent < 95) {
+            // 3. Render Silver layer on top
+            if (g5_scratchedPercent < 90) {
                 ctx.drawImage(g5_canvas, g5_x, g5_y);
             } else {
                 g5_scratchedPercent = 100;
-                drawPopWindow("🎉 恭喜获得一辈子守护特权！");
+                drawPopWindow("🎉 刮完啦！恭喜达成终身绑定契约！");
             }
 
-            // 实时进度气泡提示
+            // Real-time percent tracker
             ctx.fillStyle = COLORS.accent;
-            ctx.font = '16px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText(`已刮开: ${Math.floor(g5_scratchedPercent)}%`, 225, 500);
+            ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(`已刮开: ${Math.floor(g5_scratchedPercent)}%`, 225, 505);
         }
 
 
-        // --- 主菜单逻辑 ---
+        // --- MAIN MENU INTERFACE ---
         let menuButtons = [];
+
         function initMenu() {
             menuButtons = [
-                new Button(75, 220, 300, 60, "1. 喵喵拆盲盒", () => changeState('GAME_1'), '🎁'),
-                new Button(75, 300, 300, 60, "2. 心动连连看", () => changeState('GAME_2'), '🔗'),
-                // new Button(75, 380, 300, 60, "3. 星空许愿瓶", () => changeState('GAME_3'), '🌟'),
-                new Button(75, 460, 300, 60, "4. 喵喵打地鼠", () => changeState('GAME_4'), '🎮'),
-                new Button(75, 540, 300, 60, "5. 喵喵刮刮乐", () => changeState('GAME_5'), '🎨')
+                new Button(75, 215, 300, 64, "1. 喵喵拆盲盒", () => changeState('GAME_1'), '🎁', COLORS.accent),
+                new Button(75, 295, 300, 64, "2. 心动连连看", () => changeState('GAME_2'), '🔗', COLORS.accent),
+                new Button(75, 375, 300, 64, "3. 星空许愿瓶", () => changeState('GAME_3'), '🌟', COLORS.accent),
+                new Button(75, 455, 300, 64, "4. 喵喵打地鼠", () => changeState('GAME_4'), '🎮', COLORS.accent),
+                new Button(75, 535, 300, 64, "5. 喵喵刮刮乐", () => changeState('GAME_5'), '🎨', COLORS.accent)
             ];
         }
 
         function drawMenu() {
-            // 大标题
+            // Premium Header Marquee Block
+            ctx.save();
+            ctx.shadowBlur = 8; ctx.shadowColor = 'rgba(214, 51, 132, 0.2)';
+            ctx.fillStyle = COLORS.white;
+            ctx.beginPath();
+            ctx.roundRect(30, 45, 390, 115, 24);
+            ctx.fill();
+            ctx.restore();
+
+            // Cabinet borders
+            ctx.strokeStyle = COLORS.accent;
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.roundRect(30, 45, 390, 115, 24);
+            ctx.stroke();
+
+            // Main Title String
             ctx.fillStyle = COLORS.text;
-            ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText("💘 喵喵心动游戏厅 💘", 225, 100);
+            ctx.font = 'bold 30px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText("💘 喵喵心动游戏厅 💘", 225, 95);
             
             ctx.font = '16px sans-serif'; ctx.fillStyle = COLORS.accent;
-            ctx.fillText("点击选择你想玩的小游戏~ 😽", 225, 150);
+            ctx.fillText("点击选择你想玩的小游戏~ 😽", 225, 132);
 
+            // Update & Render Game Selector Buttons
             menuButtons.forEach(btn => {
                 btn.draw();
                 btn.checkClick();
             });
-            
-            // 装饰猫咪耳朵动效
-            ctx.fillStyle = COLORS.main;
-            ctx.beginPath();
-            ctx.moveTo(150, 50 + Math.sin(globalTimer/10)*5); ctx.lineTo(170, 20); ctx.lineTo(190, 45); ctx.fill();
-            ctx.beginPath();
-            ctx.moveTo(300, 50 + Math.sin(globalTimer/10)*5); ctx.lineTo(280, 20); ctx.lineTo(260, 45); ctx.fill();
+
+            // Base Footer Interactive Prompt
+            ctx.fillStyle = COLORS.text;
+            ctx.font = 'bold 15px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText("✨ 5种告白玩法，总有一个能令你心动 ✨", 225, 715);
+
+            // Render interactive bouncing cute cats as decorative frame icons
+            let bobY = Math.sin(globalTimer / 10) * 4;
+            drawCatFace(70, 645 + bobY, 0.48);
+            drawCatFace(380, 645 - bobY, 0.48);
         }
 
-        // --- 公共绘制助手 ---
-        function drawHeader(title) {
-            ctx.fillStyle = COLORS.text;
+        // --- Shared Graphical Components ---
+        function drawHeader(title, txtColor = COLORS.text, lineCol = COLORS.main) {
+            ctx.fillStyle = txtColor;
             ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText(title, 225, 70);
+            ctx.fillText(title, 225, 65);
             
-            // 分割线
-            ctx.strokeStyle = COLORS.main; ctx.lineWidth = 2;
-            ctx.beginPath(); ctx.moveTo(50, 100); ctx.lineTo(400, 100); ctx.stroke();
+            // Arcade-styled decorative Divider Line
+            ctx.strokeStyle = lineCol; ctx.lineWidth = 3;
+            ctx.beginPath(); ctx.moveTo(50, 95); ctx.lineTo(400, 95); ctx.stroke();
         }
 
         function drawPopWindow(text) {
-            ctx.fillStyle = 'rgba(0,0,0,0.4)';
-            ctx.fillRect(0,0, DESIGN_WIDTH, DESIGN_HEIGHT);
+            // Semi-transparent screen overlay
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            ctx.fillRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
 
+            // Pop Envelope/Frame
+            ctx.save();
             ctx.fillStyle = COLORS.white;
-            ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 4;
-            ctx.beginPath(); ctx.roundRect(40, 250, 370, 260, 24); ctx.fill(); ctx.stroke();
+            ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 5;
+            ctx.shadowColor = 'rgba(0,0,0,0.3)'; ctx.shadowBlur = 15;
+            ctx.beginPath();
+            ctx.roundRect(40, 210, 370, 310, 28);
+            ctx.fill(); ctx.stroke();
+            ctx.restore();
 
+            // Popup Heart Emblem
+            drawHeart(225, 275, 24, COLORS.accent);
+            
             ctx.fillStyle = COLORS.text;
             ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
-            ctx.fillText("💝 心动暴击 💝", 225, 310);
+            ctx.fillText("💝 心 动 暴 击 💝", 225, 325);
 
-            ctx.font = '18px sans-serif';
-            wrapText(ctx, text, 225, 370, 300, 28);
+            // Confession Text Wrapper
+            ctx.font = 'bold 17px sans-serif';
+            ctx.fillStyle = '#333333';
+            wrapText(ctx, text, 225, 365, 310, 26);
         }
 
         function wrapText(context, text, x, y, maxWidth, lineHeight) {
@@ -570,12 +1239,12 @@
             if (newState === 'GAME_5') initGame5();
         }
 
-        // --- 核心循环与自适应渲染 ---
+        // --- Canvas Game Loop and Auto Scaling ---
         function resizeCanvas() {
             const windowWidth = window.innerWidth;
             const windowHeight = window.innerHeight;
             
-            // 保持设计宽高比缩放
+            // Maintain layout ratio correctly across high resolution devices
             scale = Math.min(windowWidth / DESIGN_WIDTH, windowHeight / DESIGN_HEIGHT);
             
             canvas.width = DESIGN_WIDTH * scale;
@@ -595,6 +1264,7 @@
 
         function setupEvents() {
             const startEvent = (e) => {
+                initAudio(); // Try to initialize on first touch
                 pointer = { ...getCanvasMousePos(e), isDown: true, clicked: true };
             };
             const moveEvent = (e) => {
@@ -620,7 +1290,7 @@
             globalTimer++;
             ctx.clearRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
 
-            // 绘制当前场景
+            // Scene Router
             switch (gameState) {
                 case 'MENU': drawMenu(); break;
                 case 'GAME_1': drawGame1(); break;
@@ -630,22 +1300,22 @@
                 case 'GAME_5': drawGame5(); break;
             }
 
-            // 绘制常驻主页键
+            // Always render the return home button except on home screen
             if (gameState !== 'MENU') {
                 homeBtn.draw();
                 homeBtn.checkClick();
             }
 
-            // 特效层
+            // Render particles on top layer
             updateParticles();
 
-            // 单次点击标志位复位
+            // Reset single click triggers
             pointer.clicked = false;
 
             requestAnimationFrame(update);
         }
 
-        // --- 启动游戏 ---
+        // --- Boot Launch Sequence ---
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
         setupEvents();

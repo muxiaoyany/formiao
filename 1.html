@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>心动信号 - 心动收集器</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* 禁止移动端长按弹出菜单和选择文本 */
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0d0d1e;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        /* 打字机光标效果 */
+        .cursor-blink::after {
+            content: '|';
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 0; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="relative w-screen h-screen overflow-hidden text-slate-100 flex flex-col md:flex-row">
+
+    <!-- 左侧：交互与设置面板 -->
+    <aside class="w-full md:w-80 border-b md:border-b-0 md:border-r border-rose-950/30 bg-[#0d0d1e]/90 backdrop-blur-md flex flex-col shrink-0 z-10 p-4 justify-between h-[30%] md:h-full">
+        <div class="space-y-4">
+            <!-- 头部标识 -->
+            <div class="flex items-center space-x-3">
+                <div class="bg-gradient-to-tr from-rose-500 to-pink-500 p-2 rounded-xl shadow-lg shadow-rose-500/30 animate-pulse">
+                    <i data-lucide="heart" class="w-5 h-5 text-white fill-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-bold tracking-wider text-rose-300">心动信号 - Heartbeat</h1>
+                    <p class="text-[10px] text-slate-400">浪漫而治愈的心动收集器</p>
+                </div>
+            </div>
+
+            <!-- 自定义文案配置 -->
+            <div class="hidden md:block space-y-3 pt-4 border-t border-rose-950/20">
+                <h3 class="text-xs font-semibold text-rose-300 flex items-center space-x-1.5">
+                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                    <span>自定义浪漫告白词</span>
+                </h3>
+                
+                <!-- 52颗告白词 -->
+                <div class="space-y-1">
+                    <label class="text-[10px] text-slate-500 uppercase tracking-wider">心动达成 (52颗) 告白词</label>
+                    <textarea id="msg52" rows="2" class="w-full bg-slate-950/60 border border-rose-950/40 text-rose-100 rounded-lg p-2 text-xs focus:outline-none focus:border-rose-500/50 transition resize-none leading-relaxed" placeholder="输入告白文案...">遇见你的那一刻，就是心动的开始 💓</textarea>
+                </div>
+
+                <!-- 1314颗告白词 -->
+                <div class="space-y-1">
+                    <label class="text-[10px] text-slate-500 uppercase tracking-wider">终极心动 (1314颗) 告白词</label>
+                    <textarea id="msg1314" rows="2" class="w-full bg-slate-950/60 border border-rose-950/40 text-rose-100 rounded-lg p-2 text-xs focus:outline-none focus:border-rose-500/50 transition resize-none leading-relaxed" placeholder="输入告白文案...">我喜欢你，不是一时兴起。而是蓄谋已久的温柔 ✨</textarea>
+                </div>
+
+                <!-- 互动说明 -->
+                <div class="bg-rose-950/10 border border-rose-500/10 p-3 rounded-lg space-y-1.5 text-[11px] text-slate-400 leading-relaxed">
+                    <p class="font-medium text-rose-200/80">🎮 互动触发手册：</p>
+                    <p>• 单击屏幕任意位置：产生1颗心跳爱心</p>
+                    <p>• 双击屏幕：迸发3颗爱心+金闪星星</p>
+                    <p>• 长按屏幕：落下浪漫的璀璨爱心雨</p>
+                    <p>• 拖拽滑动：画出一抹美丽的彩色拖尾</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 底栏：音效控制与状态 -->
+        <div class="flex items-center justify-between border-t border-rose-950/20 pt-3 text-[11px]">
+            <div class="flex items-center space-x-2">
+                <button id="toggleAudio" class="flex items-center space-x-1 px-2.5 py-1.5 bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/20 text-rose-300 rounded-lg transition">
+                    <i data-lucide="volume-2" id="audioIcon" class="w-3.5 h-3.5"></i>
+                    <span id="audioStatus">音效：已开启</span>
+                </button>
+            </div>
+            <button id="resetProgress" class="text-slate-500 hover:text-rose-400 transition flex items-center space-x-1 py-1">
+                <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                <span>重置进度</span>
+            </button>
+        </div>
+    </aside>
+
+    <!-- 右侧：Canvas 浪漫交互区域 -->
+    <main class="flex-1 h-[70%] md:h-full relative overflow-hidden bg-gradient-to-b from-[#0a0a16] to-[#0e0e24]">
+        <!-- 顶部HUD面板：收集进度 -->
+        <div class="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10">
+            <!-- 计数器 -->
+            <div class="bg-slate-900/80 backdrop-blur-md border border-rose-500/20 rounded-full px-4 py-2 flex items-center space-x-3 shadow-lg">
+                <div class="flex items-center space-x-1.5">
+                    <span class="text-rose-400 animate-pulse text-base">💓</span>
+                    <span class="text-xs font-bold text-rose-200 tracking-wider">心动能量:</span>
+                </div>
+                <div class="text-sm font-mono font-black text-white flex items-baseline space-x-1">
+                    <span id="currentHearts" class="text-rose-300 text-lg">0</span>
+                    <span class="text-[10px] text-slate-500">/</span>
+                    <span id="targetHearts" class="text-slate-400">52</span>
+                </div>
+            </div>
+
+            <!-- 状态提示 -->
+            <div id="hintBubble" class="bg-slate-900/80 backdrop-blur-md border border-rose-500/20 rounded-full px-4 py-2 text-[11px] text-rose-300 font-medium shadow-md animate-bounce">
+                点击屏幕唤醒爱心吧 ✨
+            </div>
+        </div>
+
+        <!-- 进度条系统 -->
+        <div class="absolute top-18 left-4 right-4 pointer-events-none z-10 max-w-md">
+            <div class="w-full bg-slate-950/60 rounded-full h-1.5 p-0.5 border border-rose-950/20 shadow-inner overflow-hidden">
+                <div id="progressBar" class="bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <div class="flex justify-between text-[9px] text-slate-500 mt-1 pl-1 pr-1 font-mono">
+                <span>0%</span>
+                <span>心跳契合点 (52)</span>
+                <span>一生一世 (1314)</span>
+            </div>
+        </div>
+
+        <!-- 告白展示卡（心动值达成后淡入） -->
+        <div id="confessionCard" class="absolute inset-x-4 top-1/3 -translate-y-1/2 md:translate-y-0 md:top-32 max-w-lg mx-auto bg-slate-900/85 backdrop-blur-lg border-2 border-rose-500/30 rounded-2xl p-6 shadow-2xl shadow-rose-950/20 text-center pointer-events-none opacity-0 scale-95 transition-all duration-1000 z-20 flex flex-col items-center justify-center space-y-4">
+            <div class="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-400 border border-rose-500/20">
+                <i data-lucide="heart" class="w-6 h-6 fill-rose-500"></i>
+            </div>
+            <div class="space-y-2">
+                <h2 id="confessionTitle" class="text-sm font-semibold tracking-widest text-rose-300 uppercase">💌 心动时刻已达成 💌</h2>
+                <p id="confessionText" class="text-base text-rose-100 font-medium leading-relaxed italic cursor-blink px-4"></p>
+            </div>
+            <div class="text-[10px] text-rose-400/60 font-mono">
+                - 遇见你，风都变得很温柔 -
+            </div>
+        </div>
+
+        <!-- Canvas 画布 -->
+        <canvas id="loveCanvas" class="w-full h-full block cursor-pointer"></canvas>
+    </main>
+
+    <script>
+        // 初始化 Lucide 图标库
+        lucide.createIcons();
+
+        // Canvas 初始化
+        const canvas = document.getElementById('loveCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 音效合成与管理系统 (纯数字合成 Web Audio API - 零音频文件依赖)
+        let audioEnabled = true;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        // 播放合成音效
+        function playSound(type) {
+            if (!audioEnabled) return;
+            try {
+                initAudio();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                if (type === 'tap') {
+                    // "噗" 的温柔心跳声
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
+                    
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                    
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.15);
+                } else if (type === 'success') {
+                    // "叮" 的清脆风铃达成音
+                    const now = audioCtx.currentTime;
+                    const osc1 = audioCtx.createOscillator();
+                    const osc2 = audioCtx.createOscillator();
+                    const gain1 = audioCtx.createGain();
+                    const gain2 = audioCtx.createGain();
+
+                    osc1.type = 'sine';
+                    osc1.frequency.setValueAtTime(523.25, now); // C5
+                    osc1.frequency.exponentialRampToValueAtTime(1046.50, now + 0.4); // C6
+                    gain1.gain.setValueAtTime(0.2, now);
+                    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+
+                    osc2.type = 'triangle';
+                    osc2.frequency.setValueAtTime(659.25, now); // E5
+                    gain2.gain.setValueAtTime(0.15, now);
+                    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+
+                    osc1.connect(gain1);
+                    gain1.connect(audioCtx.destination);
+                    osc2.connect(gain2);
+                    gain2.connect(audioCtx.destination);
+
+                    osc1.start();
+                    osc1.stop(now + 0.5);
+                    osc2.start();
+                    osc2.stop(now + 0.5);
+                } else if (type === 'music') {
+                    // 浪漫纯八音盒达成小旋律 (简短浪漫的5音小调)
+                    const melody = [523.25, 587.33, 659.25, 783.99, 880.00]; // C D E G A
+                    const duration = 0.25;
+                    const now = audioCtx.currentTime;
+                    
+                    melody.forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, now + idx * duration);
+                        
+                        gain.gain.setValueAtTime(0.15, now + idx * duration);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + idx * duration + 0.4);
+                        
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+                        osc.start(now + idx * duration);
+                        osc.stop(now + idx * duration + 0.5);
+                    });
+                }
+            } catch (e) {
+                console.warn('Web Audio API 初始化或播放受阻:', e);
+            }
+        }
+
+        // 音频状态控制按钮绑定
+        const toggleAudioBtn = document.getElementById('toggleAudio');
+        const audioIcon = document.getElementById('audioIcon');
+        const audioStatus = document.getElementById('audioStatus');
+
+        toggleAudioBtn.addEventListener('click', () => {
+            audioEnabled = !audioEnabled;
+            if (audioEnabled) {
+                audioStatus.textContent = "音效：已开启";
+                toggleAudioBtn.className = "flex items-center space-x-1 px-2.5 py-1.5 bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/20 text-rose-300 rounded-lg transition";
+                audioIcon.setAttribute('data-lucide', 'volume-2');
+                playSound('tap');
+            } else {
+                audioStatus.textContent = "音效：已关闭";
+                toggleAudioBtn.className = "flex items-center space-x-1 px-2.5 py-1.5 bg-slate-950/30 hover:bg-slate-900/20 border border-slate-800 text-slate-500 rounded-lg transition";
+                audioIcon.setAttribute('data-lucide', 'volume-x');
+            }
+            lucide.createIcons();
+        });
+
+        // 告白文案状态
+        const msg52Input = document.getElementById('msg52');
+        const msg1314Input = document.getElementById('msg1314');
+
+        // 自适应屏幕分辨率
+        let scale = window.devicePixelRatio || 1;
+        function resizeCanvas() {
+            canvas.width = canvas.clientWidth * scale;
+            canvas.height = canvas.clientHeight * scale;
+            ctx.scale(scale, scale);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 核心运行状态
+        let currentHeartsCount = 0;
+        let isLongPressing = false;
+        let longPressTimer = null;
+        let targetHeartsMilestone = 52;
+        let confettiTriggered52 = false;
+        let confettiTriggered1314 = false;
+
+        // 对象池与粒子容器
+        const floatingHearts = []; // 存储上升的爱心对象
+        const particles = [];      // 存储爆发特效粒子
+        const trailParticles = []; // 鼠标滑动拖尾粒子
+        const backgroundStars = []; // 缓慢流动的背景星星
+
+        // 创建背景星星
+        for (let i = 0; i < 60; i++) {
+            backgroundStars.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight,
+                size: Math.random() * 1.5 + 0.5,
+                alpha: Math.random() * 0.8 + 0.2,
+                speed: Math.random() * 0.05 + 0.02
+            });
+        }
+
+        // ==================== 粒子类与工具函数定义 ====================
+
+        // 绘制 Canvas 矢量标准心形
+        function drawHeart(ctx, x, y, size) {
+            ctx.beginPath();
+            ctx.moveTo(x, y - size / 4);
+            // 三阶贝塞尔曲线精确控制优美的心形轮廓
+            ctx.bezierCurveTo(x + size / 2, y - size, x + size, y - size / 3, x, y + size * 0.9);
+            ctx.bezierCurveTo(x - size, y - size / 3, x - size / 2, y - size, x, y - size / 4);
+            ctx.closePath();
+        }
+
+        // 浮动心形类
+        class FloatingHeart {
+            constructor(x, y, isDouble = false) {
+                this.x = x;
+                this.y = y;
+                this.size = isDouble ? Math.random() * 12 + 18 : Math.random() * 10 + 12;
+                this.vx = (Math.random() - 0.5) * 2;
+                this.vy = -(Math.random() * 1.5 + 1.5);
+                this.alpha = 1;
+                this.fadeSpeed = Math.random() * 0.008 + 0.006;
+                // 温馨治愈调色盘：柔粉色 -> 玫瑰红 -> 晶莹紫 -> 橙红
+                const colors = ['#FF6B9D', '#FF4777', '#FF85B3', '#E879F9', '#FF8A65'];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.scale = 0.1; // 从小变大的弹性动画
+                this.targetScale = 1.0;
+                this.swingSpeed = Math.random() * 0.03 + 0.01;
+                this.swingRange = Math.random() * 1.5 + 0.5;
+                this.swingOffset = Math.random() * Math.PI * 2;
+            }
+
+            update() {
+                this.x += this.vx + Math.sin(this.swingOffset) * this.swingRange;
+                this.y += this.vy;
+                this.swingOffset += this.swingSpeed;
+
+                if (this.scale < this.targetScale) {
+                    this.scale += 0.08;
+                }
+
+                this.alpha -= this.fadeSpeed;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                // 添加微微的爱心发光阴影
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = this.color;
+
+                ctx.translate(this.x, this.y);
+                ctx.scale(this.scale, this.scale);
+                drawHeart(ctx, 0, 0, this.size);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // 星星/烟花爆发粒子类
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                const angle = Math.random() * Math.PI * 2;
+                const speed = Math.random() * 4 + 2;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                this.size = Math.random() * 3 + 1.5;
+                this.alpha = 1;
+                this.fadeSpeed = Math.random() * 0.02 + 0.015;
+                this.color = color || '#FFE082'; // 默认香槟金
+                this.gravity = 0.05;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.vy += this.gravity;
+                this.y += this.vy;
+                this.alpha -= this.fadeSpeed;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 8;
+                ctx.shadowColor = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // 滑动拖尾粒子类
+        class TrailParticle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.size = Math.random() * 4 + 4;
+                this.alpha = 0.8;
+                const colors = ['#FFD54F', '#F48FB1', '#81D4FA', '#A5D6A7', '#B39DDB'];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+            }
+
+            update() {
+                this.alpha -= 0.03;
+                this.size *= 0.95;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = this.color;
+                drawHeart(ctx, this.x, this.y, this.size);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        // 中心浪漫巨型心跳实体
+        const centerHeart = {
+            baseSize: 72,
+            size: 72,
+            scalePhase: 0,
+            pulseSpeed: 0.03,
+            clickAccelerate: 0,
+            x: 0,
+            y: 0,
+
+            update() {
+                // 心跳节奏控制算法：结合正弦波，实现双重收缩模拟真实心率
+                this.scalePhase += this.pulseSpeed + this.clickAccelerate;
+                if (this.clickAccelerate > 0) {
+                    this.clickAccelerate *= 0.95; // 渐进恢复常态
+                }
+
+                const wave = Math.sin(this.scalePhase) * 0.12;
+                // 第二重收缩微调，让跳动更动感
+                const doubleBeat = Math.sin(this.scalePhase * 2) * 0.04;
+                this.size = this.baseSize * (1 + wave + Math.max(0, doubleBeat));
+            },
+
+            draw(ctx, width, height) {
+                this.x = width / 2;
+                this.y = height / 2 + 15;
+
+                ctx.save();
+                // 绘制底层呼吸光晕
+                ctx.globalAlpha = 0.15 + Math.sin(this.scalePhase) * 0.05;
+                ctx.fillStyle = '#FF4777';
+                ctx.shadowBlur = 30 + Math.sin(this.scalePhase) * 15;
+                ctx.shadowColor = '#FF4777';
+                ctx.beginPath();
+                drawHeart(ctx, this.x, this.y, this.size * 1.3);
+                ctx.fill();
+
+                // 绘制核心发光爱心
+                ctx.globalAlpha = 1.0;
+                // 精致的径向渐变，营造晶莹饱满、立体温润的质感
+                const gradient = ctx.createRadialGradient(
+                    this.x - this.size * 0.2, this.y - this.size * 0.2, this.size * 0.1,
+                    this.x, this.y, this.size
+                );
+                gradient.addColorStop(0, '#FFA4C2'); // 高光淡粉
+                gradient.addColorStop(0.3, '#FF5C8A'); // 浪漫玫瑰红
+                gradient.addColorStop(1, '#CC1144'); // 边缘深红
+                
+                ctx.fillStyle = gradient;
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#FF4777';
+                ctx.beginPath();
+                drawHeart(ctx, this.x, this.y, this.size);
+                ctx.fill();
+                ctx.restore();
+            }
+        };
+
+        // ==================== 业务交互与计数触发逻辑 ====================
+
+        // 更新计数UI面板
+        const currentHeartsText = document.getElementById('currentHearts');
+        const targetHeartsText = document.getElementById('targetHearts');
+        const progressBar = document.getElementById('progressBar');
+        const hintBubble = document.getElementById('hintBubble');
+
+        function addHeartCount(count = 1) {
+            currentHeartsCount += count;
+            currentHeartsText.textContent = currentHeartsCount;
+
+            // 契合度进度计算
+            let progress = 0;
+            if (currentHeartsCount < 52) {
+                progress = (currentHeartsCount / 52) * 50; // 前半段占50%
+                targetHeartsText.textContent = "52";
+                targetHeartsMilestone = 52;
+                hintBubble.textContent = "心动能量汇聚中 ✨";
+            } else if (currentHeartsCount < 1314) {
+                // 后半段映射到 50% - 100%
+                const subProgress = ((currentHeartsCount - 52) / (1314 - 52)) * 50;
+                progress = 50 + subProgress;
+                targetHeartsText.textContent = "1314";
+                targetHeartsMilestone = 1314;
+                hintBubble.textContent = "达成第一阶段！向1314进发 ✨";
+            } else {
+                progress = 100;
+                targetHeartsText.textContent = "1314";
+                targetHeartsMilestone = 1314;
+                hintBubble.textContent = "已达成终极心动奇迹 💖";
+            }
+
+            progressBar.style.width = `${Math.min(100, progress)}%`;
+
+            // 检查里程碑达成触发
+            checkMilestones();
+        }
+
+        // 打字机告白文案展现器
+        let typeTimer = null;
+        function typeWriter(text, element, speed = 80) {
+            element.innerHTML = "";
+            let i = 0;
+            clearInterval(typeTimer);
+            element.classList.add('cursor-blink');
+            
+            typeTimer = setInterval(() => {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                } else {
+                    clearInterval(typeTimer);
+                    setTimeout(() => {
+                        element.classList.remove('cursor-blink');
+                    }, 1000);
+                }
+            }, speed);
+        }
+
+        // 里程碑事件检测器
+        const confessionCard = document.getElementById('confessionCard');
+        const confessionTitle = document.getElementById('confessionTitle');
+        const confessionText = document.getElementById('confessionText');
+
+        function checkMilestones() {
+            // 1. 52 颗心心解锁告白
+            if (currentHeartsCount >= 52 && !confettiTriggered52) {
+                confettiTriggered52 = true;
+                playSound('success');
+                playSound('music');
+                
+                // 产生大范围烟花爆烈粒子
+                for (let i = 0; i < 80; i++) {
+                    particles.push(new Particle(canvas.clientWidth / 2, canvas.clientHeight / 2 - 50, '#FF4777'));
+                    particles.push(new Particle(canvas.clientWidth / 2, canvas.clientHeight / 2 - 50, '#FFD54F'));
+                    particles.push(new Particle(canvas.clientWidth / 2, canvas.clientHeight / 2 - 50, '#81D4FA'));
+                }
+
+                // 展示告白卡
+                confessionCard.style.opacity = '1';
+                confessionCard.style.transform = 'translateY(0) scale(1)';
+                confessionTitle.textContent = "💌 心动契合达成 💌";
+                const customMsg52 = msg52Input.value.trim() || "遇见你的那一刻，就是心动的开始 💓";
+                typeWriter(customMsg52, confessionText, 100);
+            }
+
+            // 2. 1314 颗心心终极彩蛋
+            if (currentHeartsCount >= 1314 && !confettiTriggered1314) {
+                confettiTriggered1314 = true;
+                playSound('success');
+                // 循环播放浪漫旋律
+                playSound('music');
+                setTimeout(() => playSound('music'), 1500);
+
+                // 全屏大漫射烟花
+                for (let k = 0; k < 5; k++) {
+                    setTimeout(() => {
+                        const randomX = Math.random() * canvas.clientWidth;
+                        const randomY = Math.random() * (canvas.clientHeight * 0.6);
+                        const colors = ['#E879F9', '#FFD54F', '#81D4FA', '#FF4777', '#A5D6A7'];
+                        const selectedColor = colors[Math.floor(Math.random() * colors.length)];
+                        for (let i = 0; i < 60; i++) {
+                            particles.push(new Particle(randomX, randomY, selectedColor));
+                        }
+                    }, k * 400);
+                }
+
+                // 升级告白卡文案
+                confessionCard.style.opacity = '1';
+                confessionCard.style.transform = 'translateY(0) scale(1)';
+                confessionTitle.textContent = "👑 终极心动见证 👑";
+                const customMsg1314 = msg1314Input.value.trim() || "我喜欢你，不是一时兴起。而是蓄谋已久的温柔 ✨";
+                typeWriter(customMsg1314, confessionText, 90);
+            }
+        }
+
+        // 重置进度按钮事件
+        const resetProgressBtn = document.getElementById('resetProgress');
+        resetProgressBtn.addEventListener('click', () => {
+            currentHeartsCount = 0;
+            confettiTriggered52 = false;
+            confettiTriggered1314 = false;
+            currentHeartsText.textContent = "0";
+            targetHeartsText.textContent = "52";
+            progressBar.style.width = "0%";
+            hintBubble.textContent = "点击屏幕唤醒爱心吧 ✨";
+            
+            // 渐隐告白卡
+            confessionCard.style.opacity = '0';
+            confessionCard.style.transform = 'translateY(-10px) scale(0.95)';
+            clearInterval(typeTimer);
+            confessionText.innerHTML = "";
+
+            playSound('tap');
+        });
+
+        // ==================== 屏幕事件监听 (手势机制) ====================
+
+        // 处理核心生成与反馈
+        function createHeartInteract(x, y, count = 1, isDouble = false) {
+            playSound('tap');
+            addHeartCount(count);
+
+            // 让主心瞬间缩放加速跳动
+            centerHeart.clickAccelerate = 0.08;
+
+            // 产生浮动爱心
+            for (let i = 0; i < count; i++) {
+                floatingHearts.push(new FloatingHeart(x, y, isDouble));
+            }
+
+            // 产生扩散光晕粒子
+            const particleColors = ['#FF85B3', '#FFD54F', '#81D4FA', '#B39DDB'];
+            const randColor = particleColors[Math.floor(Math.random() * particleColors.length)];
+            for (let i = 0; i < (isDouble ? 15 : 6); i++) {
+                particles.push(new Particle(x, y, randColor));
+            }
+        }
+
+        // 双击交互判断
+        let lastTap = 0;
+        function handleTapStart(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            const posX = clientX - rect.left;
+            const posY = clientY - rect.top;
+
+            const now = Date.now();
+            if (now - lastTap < 300) {
+                // 1. 双击：爆发多颗爱心 + 金星粒子
+                createHeartInteract(posX, posY, 3, true);
+            } else {
+                // 2. 单击生成
+                createHeartInteract(posX, posY, 1, false);
+            }
+            lastTap = now;
+
+            // 3. 准备长按心动雨检测
+            isLongPressing = true;
+            clearTimeout(longPressTimer);
+            longPressTimer = setTimeout(() => {
+                triggerHeartRain(posX, posY);
+            }, 500);
+        }
+
+        // 长按产生心动雨效果
+        function triggerHeartRain(x, y) {
+            if (!isLongPressing) return;
+            
+            // 开启循环生成动画
+            const rainInterval = setInterval(() => {
+                if (!isLongPressing) {
+                    clearInterval(rainInterval);
+                    return;
+                }
+                // 在手势位置周围发散
+                const offsetRange = 40;
+                const rx = x + (Math.random() - 0.5) * offsetRange;
+                const ry = y + (Math.random() - 0.5) * offsetRange;
+                createHeartInteract(rx, ry, 1, false);
+            }, 100);
+        }
+
+        // 鼠标事件监听
+        canvas.addEventListener('mousedown', (e) => {
+            handleTapStart(e.clientX, e.clientY);
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isLongPressing) {
+                // 如果是长按拖动，动态调整心雨原点
+                const rect = canvas.getBoundingClientRect();
+                const posX = e.clientX - rect.left;
+                const posY = e.clientY - rect.top;
+                // 滑动留下彩星
+                trailParticles.push(new TrailParticle(posX, posY));
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isLongPressing = false;
+            clearTimeout(longPressTimer);
+        });
+
+        // 移动端 Touch 触摸事件适配 (防多指冲突)
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            handleTapStart(touch.clientX, touch.clientY);
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const posX = touch.clientX - rect.left;
+            const posY = touch.clientY - rect.top;
+            
+            trailParticles.push(new TrailParticle(posX, posY));
+        });
+
+        canvas.addEventListener('touchend', () => {
+            isLongPressing = false;
+            clearTimeout(longPressTimer);
+        });
+
+        // ==================== 渲染与动效环循环 ====================
+
+        function drawBackground() {
+            // 清理并绘制暗夜星空层
+            ctx.fillStyle = '#0d0d1e';
+            ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+            // 绘制缓慢移动闪烁的背景星尘
+            backgroundStars.forEach(star => {
+                star.y -= star.speed;
+                if (star.y < -10) {
+                    star.y = canvas.clientHeight + 10;
+                    star.x = Math.random() * canvas.clientWidth;
+                }
+                
+                // 闪烁模拟正弦
+                const opacity = star.alpha * (0.6 + Math.sin(Date.now() * 0.002 + star.x) * 0.4);
+                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function animationLoop() {
+            const w = canvas.clientWidth;
+            const h = canvas.clientHeight;
+
+            // 1. 渲染背景
+            drawBackground();
+
+            // 2. 更新及渲染中心心跳爱心
+            centerHeart.update();
+            centerHeart.draw(ctx, w, h);
+
+            // 3. 渲染拖尾轨迹粒子
+            for (let i = trailParticles.length - 1; i >= 0; i--) {
+                const trail = trailParticles[i];
+                trail.update();
+                if (trail.alpha <= 0) {
+                    trailParticles.splice(i, 1);
+                } else {
+                    trail.draw(ctx);
+                }
+            }
+
+            // 4. 渲染爆发星星特效粒子
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                } else {
+                    p.draw(ctx);
+                }
+            }
+
+            // 5. 渲染浮动上升的爱心
+            for (let i = floatingHearts.length - 1; i >= 0; i--) {
+                const heart = floatingHearts[i];
+                heart.update();
+                if (heart.alpha <= 0 || heart.y < -20) {
+                    floatingHearts.splice(i, 1);
+                } else {
+                    heart.draw(ctx);
+                }
+            }
+
+            // 保持在 60FPS 满血流畅渲染
+            requestAnimationFrame(animationLoop);
+        }
+
+        // 启动动力学浪漫渲染管线
+        animationLoop();
+
+    </script>
+</body>
+</html>

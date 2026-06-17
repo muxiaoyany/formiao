@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>喵喵心动游戏厅 💘</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #FFF0F5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #gameCanvas {
+            display: block;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 10px 30px rgba(214, 51, 132, 0.15);
+            background: linear-gradient(180deg, #FFF0F5 0%, #FFE4E1 100%);
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- 核心配置与状态 ---
+        const DESIGN_WIDTH = 450;
+        const DESIGN_HEIGHT = 800;
+        let scale = 1;
+        
+        let gameState = 'MENU'; // MENU, GAME_1, GAME_2, GAME_3, GAME_4, GAME_5
+        let pointer = { x: 0, y: 0, isDown: false, clicked: false };
+        let particles = [];
+        let globalTimer = 0;
+
+        // 统一配色
+        const COLORS = {
+            main: '#FFB6C1',   // 樱花粉
+            accent: '#FF69B4', // 玫红
+            gold: '#FFD700',   // 金色
+            bg: '#FFF0F5',     // 浅粉
+            text: '#D63384',   // 深玫红
+            white: '#FFFFFF',
+            gray: '#A9A9A9'
+        };
+
+        // --- 自定义告白文案 ---
+        const COPIES = {
+            game1_success: "不管拆到哪个，答案都是我喜欢你 💓",
+            game2_success: "I ❤ U ! 执子之手，与子偕老",
+            game3_success: "我对着星星许了愿：愿望是永远和你在一起 ✨",
+            game4_success: "别打了别打了！我投降！我喜欢你还不行吗！😂",
+            game5_success: "刮完就是我的人啦~ 😽"
+        };
+
+        // --- 按钮基类与公共组件 ---
+        class Button {
+            constructor(x, y, w, h, text, callback, icon = '') {
+                this.x = x; this.y = y; this.w = w; this.h = h;
+                this.text = text; this.callback = callback; this.icon = icon;
+                this.baseScale = 1; this.currentScale = 1;
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x + this.w/2, this.y + this.h/2);
+                ctx.scale(this.currentScale, this.currentScale);
+                
+                // 阴影
+                ctx.shadowColor = 'rgba(214, 51, 132, 0.2)';
+                ctx.shadowBlur = 8;
+                ctx.shadowOffsetY = 4;
+
+                // 按钮主体
+                ctx.fillStyle = COLORS.white;
+                ctx.strokeStyle = COLORS.accent;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.roundRect(-this.w/2, -this.h/2, this.w, this.h, 20);
+                ctx.fill();
+                ctx.stroke();
+
+                // 文字
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetY = 0;
+                ctx.fillStyle = COLORS.text;
+                ctx.font = 'bold 20px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                let displayText = this.icon ? `${this.icon} ${this.text}` : this.text;
+                ctx.fillText(displayText, 0, 0);
+                ctx.restore();
+
+                // 动效恢复
+                if (this.currentScale < this.baseScale) this.currentScale += 0.05;
+            }
+            checkClick() {
+                if (pointer.clicked && 
+                    pointer.x >= this.x && pointer.x <= this.x + this.w &&
+                    pointer.y >= this.y && pointer.y <= this.y + this.h) {
+                    this.currentScale = 0.85;
+                    createExplosion(this.x + this.w/2, this.y + this.h/2, COLORS.main, 10);
+                    this.callback();
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // 常驻返回主页按钮
+        const homeBtn = new Button(30, 720, 140, 50, "返回主菜单", () => { changeState('MENU'); }, '🏠');
+
+        // --- 粒子特效系统 ---
+        function createExplosion(x, y, color, count = 15) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    alpha: 1,
+                    size: Math.random() * 6 + 4,
+                    color: color,
+                    life: 1
+                });
+            }
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.1; // 重力
+                p.alpha -= 0.02;
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                } else {
+                    ctx.save();
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+        }
+
+        // --- 游戏 1：拆盲盒告白 🎁 ---
+        let g1_boxes = [];
+        let g1_targetIdx = 0;
+        let g1_finished = false;
+        function initGame1() {
+            g1_boxes = []; g1_finished = false;
+            g1_targetIdx = Math.floor(Math.random() * 9);
+            let startX = 65, startY = 220, spacing = 110;
+            for(let i=0; i<9; i++) {
+                let row = Math.floor(i / 3);
+                let col = i % 3;
+                g1_boxes.push({
+                    x: startX + col * spacing, y: startY + row * spacing,
+                    w: 90, h: 90, opened: false, text: "谢谢参与~"
+                });
+            }
+            g1_boxes[g1_targetIdx].text = "🎯 告白盒";
+        }
+        function drawGame1() {
+            drawHeader("🎁 拆盲盒告白");
+            let allOpened = g1_boxes.every(b => b.opened);
+            
+            g1_boxes.forEach((b, idx) => {
+                ctx.save();
+                if (!b.opened) {
+                    ctx.fillStyle = COLORS.main;
+                    ctx.strokeStyle = COLORS.accent;
+                    ctx.lineWidth = 3;
+                    ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 15); ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = COLORS.white;
+                    ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('🎁', b.x + b.w/2, b.y + b.h/2);
+
+                    if (pointer.clicked && pointer.x > b.x && pointer.x < b.x+b.w && pointer.y > b.y && pointer.y < b.y+b.h) {
+                        b.opened = true;
+                        if (idx === g1_targetIdx || g1_boxes.filter(box=>box.opened).length === 9) {
+                            g1_finished = true;
+                            createExplosion(b.x+b.w/2, b.y+b.h/2, COLORS.accent, 40);
+                        } else {
+                            createExplosion(b.x+b.w/2, b.y+b.h/2, COLORS.gold, 15);
+                        }
+                    }
+                } else {
+                    ctx.fillStyle = '#FFF';
+                    ctx.beginPath(); ctx.roundRect(b.x, b.y, b.w, b.h, 15); ctx.fill();
+                    ctx.fillStyle = COLORS.text;
+                    ctx.font = '14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    if (idx === g1_targetIdx) {
+                        ctx.font = '30px sans-serif';
+                        ctx.fillText('💗', b.x + b.w/2, b.y + b.h/2);
+                    } else {
+                        ctx.fillText('🍬 谢谢参与', b.x + b.w/2, b.y + b.h/2);
+                    }
+                }
+                ctx.restore();
+            });
+
+            if (g1_finished || allOpened) {
+                drawPopWindow(COPIES.game1_success);
+            }
+        }
+
+        // --- 游戏 2：心动连连看 🔗 ---
+        let g2_hearts = [];
+        let g2_selected = null;
+        let g2_successCount = 0;
+        let g2_finished = false;
+        const g2_colors = ['#FF69B4', '#FFD700', '#FF1493', '#00FFFF', '#FF4500', '#9370DB'];
+        function initGame2() {
+            g2_hearts = []; g2_selected = null; g2_successCount = 0; g2_finished = false;
+            // 生成6对颜色不同的左右心
+            for (let i = 0; i < 6; i++) {
+                g2_hearts.push({ id: i, side: 'left', color: g2_colors[i], x: Math.random()*120 + 40, y: 180 + i * 75, targetX: 0, targetY: 0, matched: false });
+                g2_hearts.push({ id: i, side: 'right', color: g2_colors[i], x: Math.random()*120 + 260, y: 180 + i * 75, targetX: 0, targetY: 0, matched: false });
+            }
+        }
+        function drawGame2() {
+            drawHeader("🔗 心动连连看");
+            
+            // 绘制连线/拖拽线
+            if (pointer.isDown && g2_selected) {
+                ctx.strokeStyle = g2_selected.color;
+                ctx.lineWidth = 4;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(g2_selected.x, g2_selected.y);
+                ctx.lineTo(pointer.x, pointer.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            g2_hearts.forEach(h => {
+                if (h.matched) {
+                    ctx.fillStyle = h.color;
+                    ctx.font = '40px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    ctx.fillText('💗', h.x, h.y);
+                    return;
+                }
+
+                ctx.fillStyle = h.color;
+                ctx.font = '36px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(h.side === 'left' ? '♥' : '♥', h.x, h.y); // Canvas 简单渲染半边可以使用切片或纯色心代表
+
+                if (pointer.clicked && Math.hypot(pointer.x - h.x, pointer.y - h.y) < 25) {
+                    if (h.side === 'left') g2_selected = h;
+                }
+            });
+
+            if (!pointer.isDown && g2_selected) {
+                let target = g2_hearts.find(h => h.side === 'right' && !h.matched && Math.hypot(pointer.x - h.x, pointer.y - h.y) < 35);
+                if (target && target.id === g2_selected.id) {
+                    g2_selected.matched = true;
+                    target.matched = true;
+                    g2_successCount++;
+                    createExplosion(target.x, target.y, g2_selected.color, 15);
+                    if (g2_successCount === 6) g2_finished = true;
+                }
+                g2_selected = null;
+            }
+
+            if (g2_finished) {
+                drawPopWindow(COPIES.game2_success);
+            }
+        }
+
+        // --- 游戏 3：星空许愿瓶 🌟 ---
+        let g3_stars = [];
+        let g3_bottle = { x: 225, y: 500, r: 80 };
+        let g3_collected = 0;
+        let g3_target = 52;
+        function initGame3() {
+            g3_stars = []; g3_collected = 0;
+            for(let i=0; i<30; i++) {
+                g3_stars.push({ x: Math.random()*380+30, y: Math.random()*250+150, r: Math.random()*6+4, speed: Math.random()*1+0.5, isDraggable: true });
+            }
+        }
+        function drawGame3() {
+            drawHeader("🌟 星空许愿瓶");
+
+            // 绘制许愿瓶
+            ctx.strokeStyle = COLORS.accent;
+            ctx.lineWidth = 5;
+            ctx.fillStyle = `rgba(255, 182, 193, ${0.1 + (g3_collected/g3_target)*0.4})`;
+            ctx.beginPath();
+            ctx.arc(g3_bottle.x, g3_bottle.y, g3_bottle.r, 0, Math.PI, false);
+            ctx.lineTo(g3_bottle.x + g3_bottle.r - 20, g3_bottle.y - 100);
+            ctx.lineTo(g3_bottle.x - g3_bottle.r + 20, g3_bottle.y - 100);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+            
+            // 瓶盖
+            ctx.fillStyle = COLORS.accent;
+            ctx.fillRect(g3_bottle.x - 30, g3_bottle.y - 110, 60, 15);
+
+            // 进度条
+            ctx.fillStyle = COLORS.text;
+            ctx.font = '20px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(`⭐ 进度: ${g3_collected} / ${g3_target}`, 225, 380);
+
+            // 更新与绘制星星
+            g3_stars.forEach((s, idx) => {
+                ctx.fillStyle = COLORS.gold;
+                ctx.shadowColor = COLORS.gold; ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                if (!s.inBottle) {
+                    s.y += s.speed;
+                    if (s.y > 350 && s.isDraggable) s.y = 120; // 顶部循环下落
+
+                    // 拖拽逻辑
+                    if (pointer.isDown && Math.hypot(pointer.x - s.x, pointer.y - s.y) < 25) {
+                        s.x = pointer.x; s.y = pointer.y;
+                    }
+                    
+                    // 检测是否进瓶
+                    if (!pointer.isDown && s.y > g3_bottle.y - 80 && Math.hypot(s.x - g3_bottle.x, s.y - g3_bottle.y) < g3_bottle.r) {
+                        s.inBottle = true;
+                        s.isDraggable = false;
+                        g3_collected = Math.min(g3_target, g3_collected + 2); // 每次加两颗，加速体验
+                        createExplosion(s.x, s.y, COLORS.gold, 5);
+                    }
+                } else {
+                    // 瓶内轻轻晃动
+                    s.x += Math.sin(globalTimer/10 + idx)*0.3;
+                    s.y += Math.cos(globalTimer/10 + idx)*0.3;
+                }
+            });
+
+            if (g3_collected >= g3_target) {
+                drawPopWindow(COPIES.game3_success);
+            }
+        }
+
+        // --- 游戏 4：打地鼠告白 🎮 ---
+        let g4_holes = [];
+        let g4_score = 0;
+        let g4_targetScore = 99;
+        let g4_spawnTimer = 0;
+        function initGame4() {
+            g4_score = 0; g4_holes = [];
+            let startX = 85, startY = 240, spacing = 140;
+            for(let i=0; i<9; i++) {
+                g4_holes.push({
+                    x: startX + (i%3)*spacing, y: startY + Math.floor(i/3)*spacing,
+                    type: 'none', timer: 0, hit: false
+                });
+            }
+        }
+        function drawGame4() {
+            drawHeader("🎮 打地鼠告白");
+
+            // 计分板
+            ctx.fillStyle = COLORS.text;
+            ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(`💓 心动积分: ${g4_score} / ${g4_targetScore}`, 225, 150);
+
+            g4_spawnTimer++;
+            if (g4_spawnTimer > 40 && g4_score < g4_targetScore) {
+                g4_spawnTimer = 0;
+                let activeHoles = g4_holes.filter(h => h.type === 'none');
+                if (activeHoles.length > 0) {
+                    let h = activeHoles[Math.floor(Math.random()*activeHoles.length)];
+                    let rand = Math.random();
+                    h.type = rand < 0.5 ? 'normal' : (rand < 0.8 ? 'cat' : 'heart');
+                    h.timer = 60 + Math.random()*40;
+                    h.hit = false;
+                }
+            }
+
+            g4_holes.forEach(h => {
+                // 画地洞
+                ctx.fillStyle = '#D2B48C';
+                ctx.beginPath(); ctx.ellipse(h.x, h.y+30, 40, 15, 0, 0, Math.PI*2); ctx.fill();
+
+                if (h.type !== 'none' && h.timer > 0) {
+                    h.timer--;
+                    ctx.save();
+                    let emoji = h.type === 'normal' ? '🐹' : (h.type === 'cat' ? '😺' : '💗');
+                    ctx.font = '45px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                    
+                    if (h.hit) ctx.globalAlpha = 0.5;
+                    ctx.fillText(emoji, h.x, h.y);
+                    ctx.restore();
+
+                    // 点击判定
+                    if (pointer.clicked && !h.hit && Math.hypot(pointer.x - h.x, pointer.y - h.y) < 35) {
+                        h.hit = true;
+                        let points = h.type === 'normal' ? 5 : (h.type === 'cat' ? 10 : 20);
+                        g4_score = Math.min(g4_targetScore, g4_score + points);
+                        createExplosion(h.x, h.y, COLORS.accent, 15);
+                    }
+                } else {
+                    h.type = 'none';
+                }
+            });
+
+            if (g4_score >= g4_targetScore) {
+                drawPopWindow(COPIES.game4_success);
+            }
+        }
+
+        // --- 游戏 5：刮刮乐告白 🎨 ---
+        let g5_canvas, g5_ctx;
+        let g5_scratchedPercent = 0;
+        let g5_w = 340, g5_h = 200, g5_x = 55, g5_y = 250;
+        function initGame5() {
+            g5_scratchedPercent = 0;
+            // 离屏Canvas处理刮刮乐涂层
+            g5_canvas = document.createElement('canvas');
+            g5_canvas.width = g5_w; g5_canvas.height = g5_h;
+            g5_ctx = g5_canvas.getContext('2d');
+            
+            // 填充银色涂层
+            g5_ctx.fillStyle = '#C0C0C0';
+            g5_ctx.fillRect(0, 0, g5_w, g5_h);
+            g5_ctx.fillStyle = '#999';
+            g5_ctx.font = 'bold 20px sans-serif'; g5_ctx.textAlign = 'center'; g5_ctx.textBaseline = 'middle';
+            g5_ctx.fillText('✨ 刮开图层解锁心动 ✨', g5_w/2, g5_h/2);
+        }
+        function drawGame5() {
+            drawHeader("🎨 刮刮乐告白");
+
+            // 1. 绘制底层告白结果
+            ctx.fillStyle = COLORS.white;
+            ctx.beginPath(); ctx.roundRect(g5_x, g5_y, g5_w, g5_h, 15); ctx.fill();
+            
+            ctx.fillStyle = COLORS.text;
+            ctx.font = 'bold 22px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText("✨ 终极大奖 ✨", g5_x + g5_w/2, g5_y + 60);
+            ctx.font = '18px sans-serif';
+            ctx.fillText(COPIES.game5_success, g5_x + g5_w/2, g5_y + 120);
+
+            // 2. 刮擦交互
+            if (pointer.isDown && pointer.x > g5_x && pointer.x < g5_x+g5_w && pointer.y > g5_y && pointer.y < g5_y+g5_h) {
+                g5_ctx.save();
+                g5_ctx.globalCompositeOperation = 'destination-out';
+                g5_ctx.beginPath();
+                g5_ctx.arc(pointer.x - g5_x, pointer.y - g5_y, 25, 0, Math.PI*2);
+                g5_ctx.fill();
+                g5_ctx.restore();
+                
+                // 缓慢增加进度计算（单文件纯前端简化版计数）
+                if(g5_scratchedPercent < 100) g5_scratchedPercent += 0.5;
+            }
+
+            // 3. 绘制覆盖涂层
+            if (g5_scratchedPercent < 95) {
+                ctx.drawImage(g5_canvas, g5_x, g5_y);
+            } else {
+                g5_scratchedPercent = 100;
+                drawPopWindow("🎉 恭喜获得一辈子守护特权！");
+            }
+
+            // 实时进度气泡提示
+            ctx.fillStyle = COLORS.accent;
+            ctx.font = '16px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(`已刮开: ${Math.floor(g5_scratchedPercent)}%`, 225, 500);
+        }
+
+
+        // --- 主菜单逻辑 ---
+        let menuButtons = [];
+        function initMenu() {
+            menuButtons = [
+                new Button(75, 220, 300, 60, "1. 拆盲盒告白", () => changeState('GAME_1'), '🎁'),
+                new Button(75, 300, 300, 60, "2. 心动连连看", () => changeState('GAME_2'), '🔗'),
+                new Button(75, 380, 300, 60, "3. 星空许愿瓶", () => changeState('GAME_3'), '🌟'),
+                new Button(75, 460, 300, 60, "4. 打地鼠告白", () => changeState('GAME_4'), '🎮'),
+                new Button(75, 540, 300, 60, "5. 刮刮乐告白", () => changeState('GAME_5'), '🎨')
+            ];
+        }
+
+        function drawMenu() {
+            // 大标题
+            ctx.fillStyle = COLORS.text;
+            ctx.font = 'bold 32px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText("💘 喵喵心动游戏厅 💘", 225, 100);
+            
+            ctx.font = '16px sans-serif'; ctx.fillStyle = COLORS.accent;
+            ctx.fillText("点击选择你想玩的小游戏~ 😽", 225, 150);
+
+            menuButtons.forEach(btn => {
+                btn.draw();
+                btn.checkClick();
+            });
+            
+            // 装饰猫咪耳朵动效
+            ctx.fillStyle = COLORS.main;
+            ctx.beginPath();
+            ctx.moveTo(150, 50 + Math.sin(globalTimer/10)*5); ctx.lineTo(170, 20); ctx.lineTo(190, 45); ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(300, 50 + Math.sin(globalTimer/10)*5); ctx.lineTo(280, 20); ctx.lineTo(260, 45); ctx.fill();
+        }
+
+        // --- 公共绘制助手 ---
+        function drawHeader(title) {
+            ctx.fillStyle = COLORS.text;
+            ctx.font = 'bold 28px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText(title, 225, 70);
+            
+            // 分割线
+            ctx.strokeStyle = COLORS.main; ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(50, 100); ctx.lineTo(400, 100); ctx.stroke();
+        }
+
+        function drawPopWindow(text) {
+            ctx.fillStyle = 'rgba(0,0,0,0.4)';
+            ctx.fillRect(0,0, DESIGN_WIDTH, DESIGN_HEIGHT);
+
+            ctx.fillStyle = COLORS.white;
+            ctx.strokeStyle = COLORS.accent; ctx.lineWidth = 4;
+            ctx.beginPath(); ctx.roundRect(40, 250, 370, 260, 24); ctx.fill(); ctx.stroke();
+
+            ctx.fillStyle = COLORS.text;
+            ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center';
+            ctx.fillText("💝 心动暴击 💝", 225, 310);
+
+            ctx.font = '18px sans-serif';
+            wrapText(ctx, text, 225, 370, 300, 28);
+        }
+
+        function wrapText(context, text, x, y, maxWidth, lineHeight) {
+            let words = text.split('');
+            let line = '';
+            for (let n = 0; n < words.length; n++) {
+                let testLine = line + words[n];
+                let metrics = context.measureText(testLine);
+                if (metrics.width > maxWidth && n > 0) {
+                    context.fillText(line, x, y);
+                    line = words[n];
+                    y += lineHeight;
+                } else {
+                    line = testLine;
+                }
+            }
+            context.fillText(line, x, y);
+        }
+
+        function changeState(newState) {
+            gameState = newState;
+            if (newState === 'GAME_1') initGame1();
+            if (newState === 'GAME_2') initGame2();
+            if (newState === 'GAME_3') initGame3();
+            if (newState === 'GAME_4') initGame4();
+            if (newState === 'GAME_5') initGame5();
+        }
+
+        // --- 核心循环与自适应渲染 ---
+        function resizeCanvas() {
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            
+            // 保持设计宽高比缩放
+            scale = Math.min(windowWidth / DESIGN_WIDTH, windowHeight / DESIGN_HEIGHT);
+            
+            canvas.width = DESIGN_WIDTH * scale;
+            canvas.height = DESIGN_HEIGHT * scale;
+            ctx.scale(scale, scale);
+        }
+
+        function getCanvasMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: (clientX - rect.left) / scale,
+                y: (clientY - rect.top) / scale
+            };
+        }
+
+        function setupEvents() {
+            const startEvent = (e) => {
+                pointer = { ...getCanvasMousePos(e), isDown: true, clicked: true };
+            };
+            const moveEvent = (e) => {
+                if(pointer.isDown) {
+                    pointer = { ...getCanvasMousePos(e), isDown: true, clicked: false };
+                }
+            };
+            const endEvent = () => {
+                pointer.isDown = false;
+                pointer.clicked = false;
+            };
+
+            canvas.addEventListener('mousedown', startEvent);
+            canvas.addEventListener('mousemove', moveEvent);
+            window.addEventListener('mouseup', endEvent);
+
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startEvent(e); }, { passive: false });
+            canvas.addEventListener('touchmove', (e) => { e.preventDefault(); moveEvent(e); }, { passive: false });
+            window.addEventListener('touchend', endEvent);
+        }
+
+        function update() {
+            globalTimer++;
+            ctx.clearRect(0, 0, DESIGN_WIDTH, DESIGN_HEIGHT);
+
+            // 绘制当前场景
+            switch (gameState) {
+                case 'MENU': drawMenu(); break;
+                case 'GAME_1': drawGame1(); break;
+                case 'GAME_2': drawGame2(); break;
+                case 'GAME_3': drawGame3(); break;
+                case 'GAME_4': drawGame4(); break;
+                case 'GAME_5': drawGame5(); break;
+            }
+
+            // 绘制常驻主页键
+            if (gameState !== 'MENU') {
+                homeBtn.draw();
+                homeBtn.checkClick();
+            }
+
+            // 特效层
+            updateParticles();
+
+            // 单次点击标志位复位
+            pointer.clicked = false;
+
+            requestAnimationFrame(update);
+        }
+
+        // --- 启动游戏 ---
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        setupEvents();
+        initMenu();
+        update();
+
+    </script>
+</body>
+</html>

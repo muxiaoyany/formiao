@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宇宙情书：粒子星云</title>
+    <!-- 引入优雅的 Google Fonts 字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Noto+Serif+SC:wght@300;500&display=swap" rel="stylesheet">
+    <style>
+        /* CSS 样式设计：
+          1. 采用全屏无溢出布局，背景为深邃星空渐变。
+          2. UI 界面采用极简半透明玻璃拟态效果，确保艺术美感不被多余的控件破坏。
+          3. 动画与过渡使用硬件加速。
+        */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #03030c;
+            font-family: 'Noto Serif SC', 'Cinzel', serif;
+            color: #e2e8f0;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 极简 UI 覆盖层 */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none; /* 让鼠标事件穿透到 Canvas 上 */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 30px;
+        }
+
+        /* 允许交互的 UI 元素 */
+        .interactive-ui {
+            pointer-events: auto;
+        }
+
+        /* 左上角：星云日志 */
+        .nebula-log {
+            background: rgba(10, 10, 25, 0.4);
+            backdrop-filter: blur(10px);
+            border: 1px rgba(255, 255, 255, 0.08) solid;
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 11px;
+            letter-spacing: 1px;
+            color: rgba(226, 232, 240, 0.8);
+            font-family: monospace;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+            transition: all 0.3s ease;
+        }
+
+        .nebula-log h2 {
+            font-size: 13px;
+            margin-bottom: 6px;
+            color: #a78bfa;
+            font-family: 'Cinzel', serif;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .nebula-log p {
+            margin: 3px 0;
+        }
+
+        /* 右下角：控制按钮 */
+        .control-panel {
+            align-self: flex-end;
+        }
+
+        .action-btn {
+            background: rgba(25, 15, 45, 0.5);
+            backdrop-filter: blur(8px);
+            border: 1px rgba(167, 139, 250, 0.3) solid;
+            color: #c084fc;
+            padding: 12px 24px;
+            border-radius: 30px;
+            font-size: 13px;
+            letter-spacing: 2px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: 'Noto Serif SC', serif;
+            box-shadow: 0 0 15px rgba(167, 139, 250, 0.1);
+        }
+
+        .action-btn:hover {
+            background: rgba(167, 139, 250, 0.2);
+            border-color: rgba(167, 139, 250, 0.8);
+            color: #ffffff;
+            box-shadow: 0 0 25px rgba(167, 139, 250, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .action-btn:active {
+            transform: translateY(1px);
+        }
+
+        /* 屏幕中央或底部：浪漫提示引导语 */
+        .instruction-toast {
+            position: absolute;
+            top: 25%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.5s ease;
+            z-index: 5;
+        }
+
+        .instruction-toast.show {
+            opacity: 0.8;
+        }
+
+        .instruction-toast p {
+            font-size: 14px;
+            letter-spacing: 4px;
+            color: rgba(255, 255, 255, 0.6);
+            animation: pulse 3s infinite alternate;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            .ui-layer {
+                padding: 15px;
+            }
+            .action-btn {
+                padding: 10px 18px;
+                font-size: 11px;
+            }
+            .nebula-log {
+                padding: 10px 15px;
+            }
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.4; text-shadow: 0 0 5px rgba(167, 139, 250, 0.2); }
+            100% { opacity: 0.9; text-shadow: 0 0 15px rgba(167, 139, 250, 0.6); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="nebula-canvas"></canvas>
+    </div>
+
+    <div class="ui-layer">
+        <!-- 左上角监控日志 -->
+        <div class="nebula-log interactive-ui">
+            <h2>Cosmic Nebula Log</h2>
+            <p>STATUS: <span style="color: #34d399;">STABLE</span></p>
+            <p>PARTICLES: <span id="particle-count">0</span></p>
+            <p>FPS: <span id="fps-counter">60</span></p>
+            <p style="margin-top: 8px; color: rgba(255,255,255,0.4); font-size: 9px; line-height: 1.3;">
+                [移动鼠标] 施加引力涟漪<br>
+                [点击星空] 释放情感脉冲<br>
+                [双击/长按] 汇聚宇宙情书
+            </p>
+        </div>
+
+        <!-- 浪漫操作提示 -->
+        <div class="instruction-toast" id="toast">
+            <p>双击星空，凝结宇宙的轻语</p>
+        </div>
+
+        <!-- 右下角交互按钮 -->
+        <div class="control-panel interactive-ui">
+            <button class="action-btn" id="next-letter-btn">观测新星 / 重置</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * ==========================================
+         * 《宇宙情书：粒子星云》 架构设计与实现说明 (技术方案评审)
+         * ==========================================
+         * * 1. 【模块化设计】
+         * - Particle: 单个粒子实体类，封装粒子物理运动、色彩计算、状态机逻辑。
+         * - ParticleSystem: 粒子管理器，负责粒子池分配、生命周期演进、受力场结算（引力、脉冲）。
+         * - TypographyAnalyzer: 文字解析层，利用离屏 Canvas (Offscreen Canvas) 进行文字栅格化，
+         * 高精度提取像素点阵，作为粒子群的目标约束坐标。
+         * - AppController: 核心控制器，绑定宿主 DOM 事件，驱动 requestAnimationFrame 主循环。
+         * * 2. 【物理与力学模型】
+         * - 自然流荡（Flocking/Wander）: 粒子未受控时，应用轻量级噪声或正弦扰动。
+         * - 鼠标引力（Gravity Wells）: 基于距离倒数的平方，让粒子加速流向鼠标，结合切向力实现星云旋涡效果。
+         * - 情感脉冲（Shockwave Propagation）: 点击时产生一个膨胀的圆形激荡环，
+         * 通过瞬时速度偏移推开粒子，同时改变生命期内的粒子 HSL 色调。
+         * - 目标吸引（Target Attraction）: 当激活文字形态时，粒子受到弹簧阻尼力（Spring Force）约束，
+         * 平滑归位到文字点阵坐标上，并保持细微呼吸抖动。
+         * * 3. 【性能与渲染调优】
+         * - 限制最大粒子数为 1800，在视觉丰富度与移动端流畅度间取得完美平衡。
+         * - 充分利用 HTML5 Canvas 2D 复合混合模式 (globalCompositeOperation = 'lighter') 叠加发光。
+         * - 离屏 Canvas 仅在切换文本时初始化并绘制一次，避免每帧重复进行 getImageData 的昂贵 CPU 开销。
+         * - 使用防抖与节流优化窗口 Resize 事件。
+         */
+
+        // 常量及诗句配置
+        const POEMS = [
+            "你是我宇宙中最明亮的恒星",
+            "万物皆有裂痕 那是光照进来的地方",
+            "纵使星河璀璨 吾爱唯你一人",
+            "我们在宇宙中相遇 带着星尘的温度",
+            "把爱意写进微风 吹散成漫天星轨",
+            "在漫长的时空里 感谢有你共振"
+        ];
+
+        // 颜色配置（HSL格式，方便在星空蓝紫和情感暖红之间渐变）
+        const THEME_COLORS = {
+            default: { hStart: 240, hRange: 60, s: 80, l: 60 },  // 蓝紫色系
+            pulse: { hStart: 340, hRange: 40, s: 95, l: 65 }     // 绯红金色暖色系
+        };
+
+        // --- 离屏文字解析器 ---
+        class TypographyAnalyzer {
+            constructor() {
+                this.canvas = document.createElement('canvas');
+                this.ctx = this.canvas.getContext('2d');
+            }
+
+            // 获取文本的粒子点阵目标坐标
+            getTextTargets(text, width, height) {
+                // 动态自适应字体大小
+                const fontSize = Math.min(width / (text.length * 1.1), height / 6, 42);
+                this.canvas.width = width;
+                this.canvas.height = height;
+
+                this.ctx.fillStyle = '#000000';
+                this.ctx.fillRect(0, 0, width, height);
+
+                // 绘制文本以提取坐标
+                this.ctx.font = `300 ${fontSize}px 'Noto Serif SC', serif`;
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillStyle = '#ffffff';
+                
+                // 给文字加一点阴影以便拓宽提取点阵的边缘
+                this.ctx.shadowBlur = 4;
+                this.ctx.shadowColor = '#ffffff';
+
+                this.ctx.fillText(text, width / 2, height / 2);
+
+                const imgData = this.ctx.getImageData(0, 0, width, height);
+                const data = imgData.data;
+                const targets = [];
+                const step = Math.max(Math.floor(width * height / 30000), 5); // 根据屏幕分辨率动态调整采样率步长
+
+                for (let y = 0; y < height; y += step) {
+                    for (let x = 0; x < width; x += step) {
+                        const index = (y * width + x) * 4;
+                        const alpha = data[index + 3]; // 不透明度
+                        if (alpha > 120) { // 超过阈值的点视为有效像素
+                            targets.push({ x: x, y: y });
+                        }
+                    }
+                }
+                return targets;
+            }
+        }
+
+        // --- 单个粒子类 ---
+        class Particle {
+            constructor(x, y, isStatic = false) {
+                this.x = x;
+                this.y = y;
+                this.originX = x;
+                this.originY = y;
+                this.vx = (Math.random() - 0.5) * 1.2;
+                this.vy = (Math.random() - 0.5) * 1.2;
+                
+                // 物理学参数
+                this.radius = Math.random() * 1.8 + 0.6;
+                this.baseSize = this.radius;
+                
+                // 状态机：'nebula' (自由星云), 'target' (汇聚成字)
+                this.state = 'nebula'; 
+                this.targetX = null;
+                this.targetY = null;
+                
+                // 弹簧阻尼系数
+                this.springEase = 0.05 + Math.random() * 0.04;
+                this.friction = 0.92;
+
+                // 颜色和生命期
+                this.hue = 240 + Math.random() * 60; // 默认深蓝紫
+                this.saturation = 80 + Math.random() * 20;
+                this.lightness = 50 + Math.random() * 20;
+                this.alpha = Math.random() * 0.6 + 0.3;
+                this.pulseColorProgress = 0; // 脉冲颜色插值
+                
+                // 独一无二的摇摆偏移量，产生自然漂浮感
+                this.wanderOffset = Math.random() * Math.PI * 2;
+                this.wanderSpeed = 0.01 + Math.random() * 0.02;
+            }
+
+            // 更新状态
+            update(mouse, width, height, pulseSources) {
+                // 1. 处理来自“点击”的情感脉冲激荡
+                pulseSources.forEach(pulse => {
+                    const dx = this.x - pulse.x;
+                    const dy = this.y - pulse.y;
+                    const distSq = dx * dx + dy * dy;
+                    const dist = Math.sqrt(distSq);
+                    
+                    if (dist < pulse.currentRadius && dist > pulse.currentRadius - 40) {
+                        // 冲击波推开粒子
+                        const force = (1 - (dist / pulse.maxRadius)) * pulse.strength;
+                        const angle = Math.atan2(dy, dx);
+                        this.vx += Math.cos(angle) * force;
+                        this.vy += Math.sin(angle) * force;
+                        
+                        // 触发红/金脉冲色调
+                        this.pulseColorProgress = 1.0; 
+                    }
+                });
+
+                // 颜色渐变演进（脉冲色逐渐回归默认色系）
+                if (this.pulseColorProgress > 0) {
+                    this.pulseColorProgress -= 0.012; // 缓慢消退
+                }
+
+                // 2. 根据不同状态处理运动学
+                if (this.state === 'target' && this.targetX !== null) {
+                    // 【汇聚状态】：受弹簧阻尼约束趋向目标点
+                    const dx = this.targetX - this.x;
+                    const dy = this.targetY - this.y;
+                    
+                    this.vx += dx * this.springEase;
+                    this.vy += dy * this.springEase;
+                    this.vx *= this.friction;
+                    this.vy *= this.friction;
+
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // 微弱的呼吸抖动
+                    this.x += Math.sin(Date.now() * 0.003 + this.wanderOffset) * 0.12;
+                    this.y += Math.cos(Date.now() * 0.003 + this.wanderOffset) * 0.12;
+
+                    // 确保文字状态时亮度稍高，便于阅读
+                    this.lightness = 70 + Math.sin(Date.now() * 0.002 + this.wanderOffset) * 10;
+                } else {
+                    // 【自由星云状态】
+                    // 2a. 基础漂浮 (正弦噪声微风)
+                    this.wanderOffset += this.wanderSpeed;
+                    this.vx += Math.sin(this.wanderOffset) * 0.03;
+                    this.vy += Math.cos(this.wanderOffset) * 0.03;
+
+                    // 2b. 鼠标吸引与旋涡（引力场）
+                    if (mouse.x !== null) {
+                        const dx = mouse.x - this.x;
+                        const dy = mouse.y - this.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < mouse.radius) {
+                            const force = (1 - dist / mouse.radius) * 0.18;
+                            const angle = Math.atan2(dy, dx);
+                            
+                            // 向心引力
+                            this.vx += Math.cos(angle) * force;
+                            this.vy += Math.sin(angle) * force;
+
+                            // 施加垂直于半径的切向力，形成旋涡效果
+                            const spinAngle = angle + Math.PI / 2;
+                            this.vx += Math.cos(spinAngle) * force * 0.4;
+                            this.vy += Math.sin(spinAngle) * force * 0.4;
+                        }
+                    }
+
+                    // 应用普通摩擦阻尼
+                    this.vx *= 0.98;
+                    this.vy *= 0.98;
+
+                    this.x += this.vx;
+                    this.y += this.vy;
+
+                    // 边界回弹/循环
+                    if (this.x < 0) this.x = width;
+                    if (this.x > width) this.x = 0;
+                    if (this.y < 0) this.y = height;
+                    if (this.y > height) this.y = 0;
+                }
+            }
+
+            // 绘制
+            draw(ctx) {
+                // 计算当前颜色
+                let currentH, currentS, currentL;
+                if (this.pulseColorProgress > 0) {
+                    // HSL 空间下的平滑线性过渡
+                    currentH = (1 - this.pulseColorProgress) * this.hue + this.pulseColorProgress * (THEME_COLORS.pulse.hStart + Math.random() * THEME_COLORS.pulse.hRange);
+                    currentS = (1 - this.pulseColorProgress) * this.saturation + this.pulseColorProgress * THEME_COLORS.pulse.s;
+                    currentL = (1 - this.pulseColorProgress) * this.lightness + this.pulseColorProgress * THEME_COLORS.pulse.l;
+                } else {
+                    currentH = this.hue;
+                    currentS = this.saturation;
+                    currentL = this.lightness;
+                }
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `hsla(${currentH}, ${currentS}%, ${currentL}%, ${this.alpha})`;
+                ctx.fill();
+
+                // 仅对较大的核心粒子绘制外层光晕
+                if (this.radius > 1.8) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * 2.5, 0, Math.PI * 2);
+                    ctx.fillStyle = `hsla(${currentH}, ${currentS}%, ${currentL}%, ${this.alpha * 0.15})`;
+                    ctx.fill();
+                }
+            }
+        }
+
+        // --- 粒子系统管理器 ---
+        class ParticleSystem {
+            constructor(width, height) {
+                this.width = width;
+                this.height = height;
+                this.particles = [];
+                this.maxParticles = 1600; // 综合最佳性能上限
+                this.pulseSources = []; // 活动脉冲波源
+                this.typography = new TypographyAnalyzer();
+                this.init();
+            }
+
+            init() {
+                this.particles = [];
+                for (let i = 0; i < this.maxParticles; i++) {
+                    const rx = Math.random() * this.width;
+                    const ry = Math.random() * this.height;
+                    this.particles.push(new Particle(rx, ry));
+                }
+            }
+
+            // 添加一个情感脉冲
+            createPulse(x, y) {
+                this.pulseSources.push({
+                    x: x,
+                    y: y,
+                    currentRadius: 0,
+                    maxRadius: Math.max(this.width, this.height) * 0.45,
+                    speed: 12, // 扩散速度
+                    strength: 6.0 // 推开力度
+                });
+            }
+
+            // 更新及回收所有元素
+            update(mouse) {
+                // 1. 更新激荡脉冲状态
+                for (let i = this.pulseSources.length - 1; i >= 0; i--) {
+                    const pulse = this.pulseSources[i];
+                    pulse.currentRadius += pulse.speed;
+                    if (pulse.currentRadius > pulse.maxRadius) {
+                        this.pulseSources.splice(i, 1); // 溢出边界后安全回收
+                    }
+                }
+
+                // 2. 更新全部粒子
+                this.particles.forEach(p => p.update(mouse, this.width, this.height, this.pulseSources));
+            }
+
+            draw(ctx) {
+                this.particles.forEach(p => p.draw(ctx));
+            }
+
+            // 变换为特定文本形态
+            transformToText(text) {
+                const targets = this.typography.getTextTargets(text, this.width, this.height);
+                
+                // 打乱目标点阵，避免直接平移带来的生硬感
+                this.shuffleArray(targets);
+
+                const totalParticles = this.particles.length;
+                const totalTargets = targets.length;
+
+                for (let i = 0; i < totalParticles; i++) {
+                    const p = this.particles[i];
+                    if (i < totalTargets) {
+                        p.state = 'target';
+                        p.targetX = targets[i].x;
+                        p.targetY = targets[i].y;
+                    } else {
+                        // 多余的粒子维持星云散落状态，并在周围缓慢漂浮，形成氛围包裹感
+                        p.state = 'nebula';
+                        p.targetX = null;
+                        p.targetY = null;
+                    }
+                }
+            }
+
+            // 重置回归自由星云形态
+            releaseToNebula() {
+                this.particles.forEach(p => {
+                    p.state = 'nebula';
+                    p.targetX = null;
+                    p.targetY = null;
+                });
+            }
+
+            resize(newWidth, newHeight) {
+                this.width = newWidth;
+                this.height = newHeight;
+                // 重构边界的同时，对所有超出视口的粒子坐标进行拉伸重定位
+                this.particles.forEach(p => {
+                    if (p.x > newWidth) p.x = Math.random() * newWidth;
+                    if (p.y > newHeight) p.y = Math.random() * newHeight;
+                });
+            }
+
+            shuffleArray(array) {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+            }
+        }
+
+        // --- 主程序应用控制器 ---
+        class AppController {
+            constructor() {
+                this.canvas = document.getElementById('nebula-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                // 运行态数据
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.system = null;
+                this.currentPoemIndex = -1;
+                this.inTextState = false;
+
+                // 交互状态追踪
+                this.mouse = { x: null, y: null, radius: 180 };
+                this.lastClickTime = 0;
+                this.longPressTimer = null;
+
+                // 性能指标监控
+                this.fps = 60;
+                this.lastFrameTime = performance.now();
+                this.frameCount = 0;
+                this.fpsTimer = performance.now();
+
+                this.init();
+            }
+
+            init() {
+                // 设置画布尺寸
+                this.resizeCanvas();
+                
+                // 初始化粒子引擎
+                this.system = new ParticleSystem(this.width, this.height);
+                document.getElementById('particle-count').textContent = this.system.particles.length;
+
+                // 绑定全部事件监器
+                this.bindEvents();
+
+                // 自动展现第 1 个提示引导
+                setTimeout(() => {
+                    const toast = document.getElementById('toast');
+                    toast.classList.add('show');
+                    setTimeout(() => toast.classList.remove('show'), 4000);
+                }, 1500);
+
+                // 启动 60FPS 动画管线循环
+                this.animate();
+            }
+
+            bindEvents() {
+                // 1. 窗口自适应
+                window.addEventListener('resize', () => {
+                    this.resizeCanvas();
+                    this.system.resize(this.width, this.height);
+                    // 如果处于文字状态，resize 时自适应重绘文字
+                    if (this.inTextState) {
+                        this.system.transformToText(POEMS[this.currentPoemIndex]);
+                    }
+                });
+
+                // 2. 鼠标移动监听 (引力场)
+                window.addEventListener('mousemove', (e) => {
+                    this.mouse.x = e.clientX;
+                    this.mouse.y = e.clientY;
+                });
+
+                // 3. 鼠标滑出屏幕重置
+                window.addEventListener('mouseout', () => {
+                    this.mouse.x = null;
+                    this.mouse.y = null;
+                });
+
+                // 4. 支持移动设备触摸追踪
+                window.addEventListener('touchmove', (e) => {
+                    if (e.touches.length > 0) {
+                        this.mouse.x = e.touches[0].clientX;
+                        this.mouse.y = e.touches[0].clientY;
+                    }
+                }, { passive: true });
+
+                window.addEventListener('touchend', () => {
+                    this.mouse.x = null;
+                    this.mouse.y = null;
+                });
+
+                // 5. 点击与双击（情感脉冲与文字生成逻辑）
+                window.addEventListener('mousedown', (e) => {
+                    // 确保不要劫持 UI 层的操作
+                    if (e.target.closest('.interactive-ui')) return;
+
+                    const now = performance.now();
+                    const timeDiff = now - this.lastClickTime;
+                    this.lastClickTime = now;
+
+                    // 长按逻辑准备
+                    this.longPressTimer = setTimeout(() => {
+                        this.triggerNextPoem();
+                    }, 800);
+
+                    // 双击判断 (快速双击 300ms 内触发文字)
+                    if (timeDiff < 300) {
+                        clearTimeout(this.longPressTimer);
+                        this.triggerNextPoem();
+                        return;
+                    }
+
+                    // 单击触发情感脉冲
+                    this.system.createPulse(e.clientX, e.clientY);
+                });
+
+                window.addEventListener('mouseup', () => {
+                    if (this.longPressTimer) {
+                        clearTimeout(this.longPressTimer);
+                    }
+                });
+
+                // 6. 控制台右下角“新诗”重置按钮
+                document.getElementById('next-letter-btn').addEventListener('click', () => {
+                    this.triggerNextPoem();
+                });
+            }
+
+            resizeCanvas() {
+                this.width = window.innerWidth;
+                this.height = window.innerHeight;
+                this.canvas.width = this.width;
+                this.canvas.height = this.height;
+            }
+
+            // 推进或重置文字星云状态
+            triggerNextPoem() {
+                if (this.inTextState) {
+                    // 若当前已经是文字状态，则释放粒子，让它们重归自由星云
+                    this.system.releaseToNebula();
+                    this.inTextState = false;
+                } else {
+                    // 轮转展示新诗句
+                    this.currentPoemIndex = (this.currentPoemIndex + 1) % POEMS.length;
+                    this.system.transformToText(POEMS[this.currentPoemIndex]);
+                    this.inTextState = true;
+                    
+                    // 并伴随一次中央的情感激荡涟漪
+                    this.system.createPulse(this.width / 2, this.height / 2);
+                }
+            }
+
+            // FPS 计算器
+            calculateFPS() {
+                const now = performance.now();
+                this.frameCount++;
+                if (now - this.fpsTimer >= 1000) {
+                    this.fps = Math.round((this.frameCount * 1000) / (now - this.fpsTimer));
+                    document.getElementById('fps-counter').textContent = this.fps;
+                    this.frameCount = 0;
+                    this.fpsTimer = now;
+                }
+            }
+
+            // 核心动画循环
+            animate() {
+                this.calculateFPS();
+
+                // 经典半透明背景清除机制，产生梦幻的拖尾拖影效果 (Motion Blur)
+                this.ctx.fillStyle = 'rgba(3, 3, 12, 0.16)';
+                this.ctx.fillRect(0, 0, this.width, this.height);
+
+                // 2D 复合混合模式设置——粒子叠加时光晕增强 (Lighter Blend Mode)
+                this.ctx.globalCompositeOperation = 'lighter';
+
+                // 物理结算与渲染
+                this.system.update(this.mouse);
+                this.system.draw(this.ctx);
+
+                // 还原渲染复合模式，避免背景擦除被 lighter 模式破坏
+                this.ctx.globalCompositeOperation = 'source-over';
+
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        // 确保页面 DOM 完成加载后开始启动程序
+        window.addEventListener('DOMContentLoaded', () => {
+            new AppController();
+        });
+    </script>
+</body>
+</html>

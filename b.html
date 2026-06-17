@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>3D梦幻城堡</title>
+    <title>3D梦幻城堡 - 抖音直播礼物特效完美还原</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <!-- 引入高雅的中英文字体组合 -->
@@ -21,7 +21,7 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #05020a;
+            background-color: #030107;
             font-family: 'Noto Serif SC', 'Cinzel', serif;
             color: #e2e8f0;
         }
@@ -122,7 +122,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(10, 4, 25, 0.97);
+            background-color: rgba(8, 3, 20, 0.98);
             z-index: 100;
             display: flex;
             flex-direction: column;
@@ -204,7 +204,7 @@
     <div class="intro-screen" id="intro-screen">
         <div class="castle-logo">🏰</div>
         <h1 class="intro-title">ROYAL EPIC CASTLE</h1>
-        <p class="intro-subtitle">1:1 精密还原哥特悬廊城堡 · 全屏自适应物理烟花</p>
+        <p class="intro-subtitle">1:1 精密雕琢哥特式白瓷法阵城堡 · 物理烟花盛宴</p>
         <button class="start-btn" id="start-btn">开启奢华 3D 星空</button>
     </div>
 
@@ -224,65 +224,66 @@
 
     <script>
         // =========================================================================
-        // 《3D 皇家梦幻城堡与物理烟花》引擎与渲染管线
+        // 《3D 皇家梦幻城堡与物理烟花》- 1:1 雕塑级重构版
         // =========================================================================
 
         const PALETTE = {
-            pink: 0xffb7c5,        // 樱花粉色
-            hotPink: 0xff6b9b,     // 深玫瑰粉
-            white: 0xfffdf6,       // 象牙白/珍珠白
-            gold: 0xffd700,        // 皇家黄金
-            darkGold: 0xc5a000,    // 暗金
-            yellow: 0xfff0b8,      // 柔和窗黄
-            bgTop: 0x060312,       // 遥远星空顶
-            bgBottom: 0x140722,    // 地平线深紫
-            fireworks: [0xff3f6c, 0x1e73ff, 0xae46ff, 0xff5bb0, 0xffd700, 0x00f3db]
+            porcelain: 0xffffff,    // 象牙珍珠白（城堡高光滑腻石料）
+            roofPorcelain: 0xeaecef, // 浅灰瓷顶瓦
+            gold: 0xffd700,         // 电镀皇家金
+            bgTop: 0x030107,        // 深邃夜空顶
+            bgBottom: 0x0e051c,     // 地平线蓝紫晕光
+            fireworks: [0xff2a6d, 0x05d9e8, 0x01012b, 0xf5a623, 0xb9ff00, 0xff007f]
         };
 
         class Gift3DEngine {
             constructor() {
                 this.container = document.getElementById('canvas-container');
                 
-                // 动效核心时间轴
                 this.timeline = 0;
                 this.lastTime = performance.now();
                 this.isPlaying = false;
 
-                // 3D 场景、相机、渲染器初始化
+                // 3D 场景与高精度雾化效果
                 this.scene = new THREE.Scene();
-                this.scene.fog = new THREE.FogExp2(0x060312, 0.015);
+                this.scene.fog = new THREE.FogExp2(0x030107, 0.014);
 
                 this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
                 this.adjustCameraForViewport();
 
-                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+                // 启用完美抗锯齿渲染
+                this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 this.renderer.setClearColor(PALETTE.bgTop, 1);
                 this.container.appendChild(this.renderer.domElement);
 
-                // 轨道群组
+                // 轨道阻尼
                 this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
                 this.controls.enableDamping = true;
                 this.controls.dampingFactor = 0.05;
-                this.controls.maxPolarAngle = Math.PI / 2 - 0.02; // 禁止穿入地表
+                this.controls.maxPolarAngle = Math.PI / 2 - 0.05; 
                 this.controls.minDistance = 15;
-                this.controls.maxDistance = 150;
-                // 锁定视觉中心为 (0,0,0) 实现绝对居中
+                this.controls.maxDistance = 120;
                 this.controls.target.set(0, 0, 0);
 
-                // 实体群组
+                // 核心节点群组
                 this.castleGroup = new THREE.Group();
                 this.scene.add(this.castleGroup);
 
                 this.magicCircle = null;
                 this.windowLights = [];
+                this.solidMeshes = []; // 收集所有非玻璃实体，用于在升起后关闭透明模式
                 this.flags = []; 
                 this.fireworks = []; 
 
                 this.convergeParticles = null;
                 this.fallingStars = null;
+
+                // 生成高亮彩虹玻璃贴图
+                this.stainedGlassTexture = this.createStainedGlassTexture();
 
                 this.setupLights();
                 this.buildCastle();
@@ -290,385 +291,565 @@
                 this.buildFallingStars();
                 this.bindEvents();
 
-                // 启动动画主循环
                 window.onload = () => {
                     this.animate();
                 };
             }
 
-            // 根据屏幕比例动态自适应相机高度和深度
+            // 生成高度鲜明的哥特极光彩绘玻璃渐变
+            createStainedGlassTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 128;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                
+                const grad = ctx.createLinearGradient(0, 0, 0, 256);
+                grad.addColorStop(0, '#ffe066');
+                grad.addColorStop(0.35, '#f03e3e');
+                grad.addColorStop(0.7, '#ae3ec9');
+                grad.addColorStop(1, '#15aabf');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, 128, 256);
+
+                // 细密窗花格线
+                ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)'; 
+                ctx.lineWidth = 4;
+                for (let i = 0; i <= 128; i += 32) {
+                    ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 256); ctx.stroke();
+                }
+                for (let j = 0; j <= 256; j += 64) {
+                    ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(128, j); ctx.stroke();
+                }
+                
+                const texture = new THREE.CanvasTexture(canvas);
+                return texture;
+            }
+
             adjustCameraForViewport() {
                 const aspect = window.innerWidth / window.innerHeight;
                 if (aspect < 1.0) {
-                    // 竖屏 (手机端)，将相机退回更远，并略微调高，确保城堡绝对完美居中
-                    this.camera.position.set(0, 20, 52);
+                    this.camera.position.set(0, 16, 45);
                 } else {
-                    // 横屏 (电脑端)
-                    this.camera.position.set(0, 16, 42);
+                    this.camera.position.set(0, 12, 36);
                 }
             }
 
             setupLights() {
-                // 大气环境底光
-                const ambientLight = new THREE.AmbientLight(0x23143d, 1.5);
+                // 环境反射紫光，突出暗面神秘感
+                const ambientLight = new THREE.AmbientLight(0x1a102e, 2.5);
                 this.scene.add(ambientLight);
 
-                // 温暖耀眼的粉金斜射主光源
-                this.dirLight = new THREE.DirectionalLight(0xffb7c5, 2.0);
-                this.dirLight.position.set(20, 30, 25);
+                // 主投射暖白光，刻画城堡完美的珍珠瓷轮廓，生成极富立体感的软阴影
+                this.dirLight = new THREE.DirectionalLight(0xffffff, 3.2);
+                this.dirLight.position.set(20, 40, 25);
                 this.dirLight.castShadow = true;
                 this.dirLight.shadow.mapSize.width = 2048;
                 this.dirLight.shadow.mapSize.height = 2048;
+                this.dirLight.shadow.bias = -0.0004;
+                this.dirLight.shadow.camera.near = 10;
+                this.dirLight.shadow.camera.far = 100;
+                const d = 15;
+                this.dirLight.shadow.camera.left = -d;
+                this.dirLight.shadow.camera.right = d;
+                this.dirLight.shadow.camera.top = d;
+                this.dirLight.shadow.camera.bottom = -d;
                 this.scene.add(this.dirLight);
 
-                // 侧向辅蓝光以打磨大理石暗部边缘
-                this.fillLight = new THREE.DirectionalLight(0x356aff, 0.9);
-                this.fillLight.position.set(-20, 15, -15);
+                // 极具渲染张力的紫粉色边缘逆光
+                this.fillLight = new THREE.DirectionalLight(0xe03131, 1.5);
+                this.fillLight.position.set(-20, 10, -20);
                 this.scene.add(this.fillLight);
 
-                // 正中心聚光灯，高亮城堡核心
-                this.spotLight = new THREE.SpotLight(0xffffff, 3.0);
+                // 聚光灯：笔直打在至尊双塔顶，提供局部强烈高光反射
+                this.spotLight = new THREE.SpotLight(0xffffff, 2.5);
                 this.spotLight.position.set(0, 50, 0);
-                this.spotLight.angle = Math.PI / 3;
-                this.spotLight.penumbra = 0.9;
+                this.spotLight.angle = Math.PI / 5;
+                this.spotLight.penumbra = 0.8;
                 this.scene.add(this.spotLight);
             }
 
-            // --- 精密3D城堡构建 (Gothic皇家粉白拼接风格，一比一复刻参考图) ---
+            // === 纯手工精确绘制哥特尖拱（Gothic Arch）数学形状曲线 ===
+            getGothicArchShape(w, h) {
+                const shape = new THREE.Shape();
+                const straightH = h - w / 2; // 垂直段高度
+                shape.moveTo(-w / 2, 0);
+                shape.lineTo(-w / 2, straightH);
+                // 使用控制点拉出完美的对称哥特式尖顶曲线
+                shape.quadraticCurveTo(-w / 2, h, 0, h);
+                shape.quadraticCurveTo(w / 2, h, w / 2, straightH);
+                shape.lineTo(w / 2, 0);
+                shape.closePath();
+                return shape;
+            }
+
+            // === 1:1 复刻级城堡三维雕刻 ===
             buildCastle() {
-                // 1. 材质定义 (珍珠大理石白 / 樱花磨砂粉 / 皇家电镀金)
-                const wallMaterial = new THREE.MeshStandardMaterial({
-                    color: PALETTE.white,
-                    roughness: 0.35,
-                    metalness: 0.08
+                // 1. 材质声明（高精度的材质属性是还原艺术感的绝对秘诀）
+                const porcelainMaterial = new THREE.MeshStandardMaterial({
+                    color: PALETTE.porcelain,
+                    roughness: 0.15,
+                    metalness: 0.08,
+                    side: THREE.DoubleSide
                 });
 
                 const roofMaterial = new THREE.MeshStandardMaterial({
-                    color: PALETTE.pink,
-                    roughness: 0.28,
-                    metalness: 0.12
-                });
-
-                const accentMaterial = new THREE.MeshStandardMaterial({
-                    color: PALETTE.hotPink,
-                    roughness: 0.35,
-                    metalness: 0.08
+                    color: PALETTE.roofPorcelain,
+                    roughness: 0.22,
+                    metalness: 0.05,
+                    side: THREE.DoubleSide
                 });
 
                 const goldMaterial = new THREE.MeshStandardMaterial({
                     color: PALETTE.gold,
-                    roughness: 0.15,
-                    metalness: 0.9
+                    roughness: 0.05,
+                    metalness: 0.95
                 });
 
-                const windowOffMaterial = new THREE.MeshBasicMaterial({ color: 0x140a20 });
+                // 自发光彩虹拼花玻璃
+                const glassMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    map: this.stainedGlassTexture,
+                    emissiveMap: this.stainedGlassTexture,
+                    emissive: 0xffffff,
+                    emissiveIntensity: 0.9,
+                    roughness: 0.05,
+                    metalness: 0.1,
+                    transparent: true,
+                    opacity: 0.92,
+                    side: THREE.DoubleSide
+                });
 
-                // 2. 辅助建造器：带有精致雕边的高挺拱形窗户
-                const createGothicWindow = (x, y, z, rotY, parent) => {
+                // 2. 哥特拱形浮雕窗生成器
+                const createGothicWindow = (x, y, z, rY, w, h, parent, isMain = false) => {
                     const winGroup = new THREE.Group();
                     winGroup.position.set(x, y, z);
-                    winGroup.rotation.y = rotY;
+                    winGroup.rotation.y = rY;
 
-                    // 拱门形发光片背板
-                    const backGeo = new THREE.BoxGeometry(0.32, 0.7, 0.04);
-                    const back = new THREE.Mesh(backGeo, windowOffMaterial.clone());
-                    winGroup.add(back);
-                    this.windowLights.push(back); // 登记以便稍后点亮
+                    // 1:1 数学曲线彩色窗心
+                    const shape = this.getGothicArchShape(w, h);
+                    const glassGeo = new THREE.ShapeGeometry(shape);
+                    // 居中偏移以便完美贴壁
+                    const glassMesh = new THREE.Mesh(glassGeo, glassMaterial.clone());
+                    glassMesh.position.set(0, 0, 0.02);
+                    winGroup.add(glassMesh);
+                    this.windowLights.push(glassMesh);
 
-                    // 黄金外框架
-                    const frameGeo = new THREE.BoxGeometry(0.4, 0.78, 0.05);
-                    const frame = new THREE.Mesh(frameGeo, goldMaterial);
-                    frame.position.z = -0.01;
-                    winGroup.add(frame);
+                    // 精细金色窗框描边
+                    const extrudeSettings = { depth: 0.08, bevelEnabled: true, bevelSegments: 2, steps: 1, bevelSize: 0.02, bevelThickness: 0.02 };
+                    const frameGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                    const frameMesh = new THREE.Mesh(frameGeo, goldMaterial);
+                    frameMesh.position.set(0, 0, -0.04);
+                    winGroup.add(frameMesh);
+                    this.solidMeshes.push(frameMesh);
+
+                    if (isMain) {
+                        // 顶部金色尖锐的哥特式悬索尖角（Pinnacle Gable）
+                        const pinGeo = new THREE.ConeGeometry(w/2 + 0.06, 0.5, 4);
+                        const pin = new THREE.Mesh(pinGeo, goldMaterial);
+                        pin.rotation.y = Math.PI / 4;
+                        pin.position.y = h + 0.25;
+                        winGroup.add(pin);
+                        this.solidMeshes.push(pin);
+                    }
 
                     parent.add(winGroup);
                 };
 
-                // 3. 辅助建造器：随风微动黄金小旌旗
-                const createFlag = (x, y, z, parent) => {
-                    const poleGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 8);
-                    const pole = new THREE.Mesh(poleGeo, goldMaterial);
-                    pole.position.set(x, y + 0.9, z);
-                    parent.add(pole);
+                // 3. 至高顶端金色皇冠风铃与多曲十字风向标
+                const createTopCrest = (x, y, z, parent) => {
+                    const crestGroup = new THREE.Group();
+                    crestGroup.position.set(x, y, z);
 
-                    // 锥体模拟旗面
-                    const flagGeo = new THREE.ConeGeometry(0.45, 1.0, 4);
-                    const flag = new THREE.Mesh(flagGeo, accentMaterial);
-                    flag.rotation.z = Math.PI / 2;
-                    flag.position.set(x + 0.42, y + 1.4, z);
-                    parent.add(flag);
-                    this.flags.push(flag); 
+                    // 中心主金杆
+                    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.0, 8), goldMaterial);
+                    crestGroup.add(pole);
+
+                    // 黄金皇冠
+                    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.28, 0.25, 12), goldMaterial);
+                    crown.position.y = 0.6;
+                    crestGroup.add(crown);
+
+                    // 十字多向弯折导风翼
+                    const curve1 = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.04, 8, 20, Math.PI), goldMaterial);
+                    curve1.rotation.y = 0;
+                    curve1.position.y = 1.0;
+                    const curve2 = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.04, 8, 20, Math.PI), goldMaterial);
+                    curve2.rotation.y = Math.PI / 2;
+                    curve2.position.y = 1.0;
+                    crestGroup.add(curve1, curve2);
+
+                    const star = new THREE.Mesh(new THREE.SphereGeometry(0.12, 12, 12), goldMaterial);
+                    star.position.y = 1.45;
+                    crestGroup.add(star);
+
+                    parent.add(crestGroup);
+                    this.solidMeshes.push(pole, crown, curve1, curve2, star);
                 };
 
-                // 4. 辅助建造器：高空悬挂跨接拱桥 (复刻参考图)
-                const createBridge = (xStart, zStart, xEnd, zEnd, height, parent) => {
-                    const bridgeGroup = new THREE.Group();
-                    bridgeGroup.position.set((xStart + xEnd) / 2, height, (zStart + zEnd) / 2);
-                    
-                    const dx = xEnd - xStart;
-                    const dz = zEnd - zStart;
-                    const len = Math.sqrt(dx * dx + dz * dz);
-                    const angle = Math.atan2(dz, dx);
-                    bridgeGroup.rotation.y = -angle;
-
-                    // 桥身主体
-                    const spanGeo = new THREE.BoxGeometry(len, 0.4, 0.7);
-                    const span = new THREE.Mesh(spanGeo, accentMaterial);
-                    bridgeGroup.add(span);
-
-                    // 桥身底部金色支撑拱拱圈
-                    const archGeo = new THREE.CylinderGeometry(len/2, len/2, 0.6, 16, 1, false, 0, Math.PI);
-                    const arch = new THREE.Mesh(archGeo, goldMaterial);
-                    arch.rotation.x = Math.PI / 2;
-                    arch.position.y = -0.3;
-                    bridgeGroup.add(arch);
-
-                    // 桥上两侧金色围网安全扶手
-                    const railGeo1 = new THREE.BoxGeometry(len, 0.35, 0.04);
-                    const rail1 = new THREE.Mesh(railGeo1, goldMaterial);
-                    rail1.position.z = 0.33;
-                    rail1.position.y = 0.3;
-                    const rail2 = new THREE.Mesh(railGeo1, goldMaterial);
-                    rail2.position.z = -0.33;
-                    rail2.position.y = 0.3;
-                    bridgeGroup.add(rail1, rail2);
-
-                    parent.add(bridgeGroup);
-                };
-
-                // ==========================================
-                // 🏰【3D 城堡物理空间整体向下平移 `-7.5`，实现绝对视觉居中】🏰
-                // ==========================================
+                // === 坐标系统下移 6.5，保证竖屏/横屏在 3D 空间内视觉水平线完美居中 ===
                 const rootPivot = new THREE.Group();
-                rootPivot.position.y = -7.5; 
+                rootPivot.position.y = -6.5; 
                 this.castleGroup.add(rootPivot);
 
-                // === A. 皇家大型八角双层阶梯底座 ===
+                // === A. 八角白瓷阶梯大底盘 ===
                 const baseGroup = new THREE.Group();
-                const baseGeo1 = new THREE.CylinderGeometry(9.0, 9.6, 1.4, 8);
-                const b1 = new THREE.Mesh(baseGeo1, wallMaterial);
-                b1.position.y = 0.7;
-                baseGroup.add(b1);
+                const base1 = new THREE.Mesh(new THREE.CylinderGeometry(9.6, 10.2, 1.4, 8), porcelainMaterial);
+                base1.position.y = 0.7;
+                baseGroup.add(base1);
 
-                const baseGeo2 = new THREE.CylinderGeometry(7.6, 8.2, 0.9, 8);
-                const b2 = new THREE.Mesh(baseGeo2, accentMaterial);
-                b2.position.y = 1.85;
-                baseGroup.add(b2);
+                // 双层收缩黄金台阶包边，断绝简陋与粗糙
+                const trim1 = new THREE.Mesh(new THREE.CylinderGeometry(9.7, 9.7, 0.15, 8), goldMaterial);
+                trim1.position.y = 1.42;
+                const base2 = new THREE.Mesh(new THREE.CylinderGeometry(8.4, 8.8, 0.8, 8), porcelainMaterial);
+                base2.position.y = 1.8;
+                baseGroup.add(trim1, base2);
                 rootPivot.add(baseGroup);
+                this.solidMeshes.push(base1, trim1, base2);
 
-                // === B. 主殿 Core Keep ===
-                const keepGroup = new THREE.Group();
-                keepGroup.position.y = 2.3;
+                // === B. 前置皇家白瓷台阶（带圆柱球冠扶手） ===
+                const stepsGroup = new THREE.Group();
+                stepsGroup.position.set(0, 0.0, 8.4);
 
-                const mainHallGeo = new THREE.BoxGeometry(7.4, 5.5, 7.4);
-                const mainHall = new THREE.Mesh(mainHallGeo, wallMaterial);
-                mainHall.position.y = 2.75;
-                keepGroup.add(mainHall);
-
-                // 裙墙城楼精美刻线与金边
-                const trimGeo = new THREE.BoxGeometry(7.6, 0.3, 7.6);
-                const trim = new THREE.Mesh(trimGeo, goldMaterial);
-                trim.position.y = 5.5;
-                keepGroup.add(trim);
-
-                // 齿轮状悬挑城垛
-                for (let i = -3.4; i <= 3.4; i += 1.7) {
-                    const battlementGeo = new THREE.BoxGeometry(0.85, 0.65, 0.35);
-                    const bFront = new THREE.Mesh(battlementGeo, accentMaterial);
-                    bFront.position.set(i, 5.8, 3.65);
-                    const bBack = new THREE.Mesh(battlementGeo, accentMaterial);
-                    bBack.position.set(i, 5.8, -3.65);
-                    keepGroup.add(bFront, bBack);
+                const stepsCount = 6;
+                for (let i = 0; i < stepsCount; i++) {
+                    const stepW = 4.0 - i * 0.25;
+                    const stepH = 0.22;
+                    const stepD = 1.1 + i * 0.15;
+                    const step = new THREE.Mesh(new THREE.BoxGeometry(stepW, stepH, stepD), porcelainMaterial);
+                    step.position.set(0, stepH * i + 0.11, -i * 0.1);
+                    stepsGroup.add(step);
+                    this.solidMeshes.push(step);
                 }
 
-                // 殿前高挺拱形对称窗户
-                createGothicWindow(-1.9, 2.8, 3.72, 0, keepGroup);
-                createGothicWindow(1.9, 2.8, 3.72, 0, keepGroup);
+                // 雕刻两侧端坐的台阶圆形扶手饰（1:1完美还原原图中的台阶细节）
+                const railL = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.3, 1.8), porcelainMaterial);
+                railL.position.set(-2.1, 0.7, -0.4);
+                railL.rotation.x = -0.25;
+                const ballL = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), porcelainMaterial);
+                ballL.position.set(-2.1, 0.45, 0.6);
+                const goldBallL = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), goldMaterial);
+                goldBallL.position.set(-2.1, 0.8, 0.6);
 
-                // === C. 华丽飞扶壁前卫双塔 (Front Spires) ===
-                const buildFrontTower = (xSide) => {
-                    const tower = new THREE.Group();
-                    tower.position.set(xSide * 4.8, 2.3, 3.2);
+                const railR = new THREE.Mesh(new THREE.BoxGeometry(0.3, 1.3, 1.8), porcelainMaterial);
+                railR.position.set(2.1, 0.7, -0.4);
+                railR.rotation.x = -0.25;
+                const ballR = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 16), porcelainMaterial);
+                ballR.position.set(2.1, 0.45, 0.6);
+                const goldBallR = new THREE.Mesh(new THREE.SphereGeometry(0.15, 12, 12), goldMaterial);
+                goldBallR.position.set(2.1, 0.8, 0.6);
 
-                    // 多段渐变棱角塔身
-                    const towerBodyGeo = new THREE.CylinderGeometry(1.05, 1.25, 8.0, 12);
-                    const towerBody = new THREE.Mesh(towerBodyGeo, wallMaterial);
-                    towerBody.position.y = 4.0;
-                    tower.add(towerBody);
+                stepsGroup.add(railL, ballL, goldBallL, railR, ballR, goldBallR);
+                rootPivot.add(stepsGroup);
+                this.solidMeshes.push(railL, ballL, goldBallL, railR, ballR, goldBallR);
 
-                    // 塔腰金色带刻字圆环
-                    const ringGeo = new THREE.CylinderGeometry(1.2, 1.2, 0.25, 12);
-                    const ring = new THREE.Mesh(ringGeo, goldMaterial);
-                    ring.position.y = 4.8;
-                    tower.add(ring);
+                // === C. 核心主殿大堂（Main Sanctuary Hall） ===
+                const mainHallGroup = new THREE.Group();
+                mainHallGroup.position.set(0, 2.2, 0);
 
-                    // 高空城楼围网观景露台
-                    const terraceGeo = new THREE.CylinderGeometry(1.35, 1.35, 0.45, 12);
-                    const terrace = new THREE.Mesh(terraceGeo, accentMaterial);
-                    terrace.position.y = 8.2;
-                    tower.add(terrace);
+                const hallWall = new THREE.Mesh(new THREE.BoxGeometry(7.0, 5.6, 7.8), porcelainMaterial);
+                hallWall.position.y = 2.8;
+                mainHallGroup.add(hallWall);
+                this.solidMeshes.push(hallWall);
 
-                    // 黄金尖围栏环
-                    const fenceGeo = new THREE.CylinderGeometry(1.4, 1.4, 0.25, 12, 1, true);
-                    const fence = new THREE.Mesh(fenceGeo, goldMaterial);
-                    fence.position.y = 8.5;
-                    tower.add(fence);
-
-                    // 尖耸锥形瓦片塔盖
-                    const spireGeo = new THREE.ConeGeometry(1.42, 4.6, 12);
-                    const spire = new THREE.Mesh(spireGeo, roofMaterial);
-                    spire.position.y = 10.6;
-                    tower.add(spire);
-
-                    createFlag(0, 12.9, 0, tower);
-
-                    // 丰富窗棂细节
-                    createGothicWindow(0, 5.8, 1.08, 0, tower);
-                    createGothicWindow(xSide * 1.08, 3.6, 0, xSide * Math.PI/2, tower);
-
-                    rootPivot.add(tower);
-                };
-                buildFrontTower(-1);
-                buildFrontTower(1);
-
-                // === D. 殿后至高史诗塔楼群 (含高空跨接连接拱桥 + 倾斜飞扶壁) ===
-                const buildRearTower = (xSide) => {
-                    const tower = new THREE.Group();
-                    tower.position.set(xSide * 4.6, 2.3, -3.4);
-
-                    // 极高一阶底座塔柱 (白色)
-                    const baseBodyGeo = new THREE.CylinderGeometry(1.25, 1.35, 11.0, 12);
-                    const baseBody = new THREE.Mesh(baseBodyGeo, wallMaterial);
-                    baseBody.position.y = 5.5;
-                    tower.add(baseBody);
-
-                    // 玫瑰粉色多面体腰台露台
-                    const midTerraceGeo = new THREE.CylinderGeometry(1.45, 1.45, 0.55, 12);
-                    const midTerrace = new THREE.Mesh(midTerraceGeo, accentMaterial);
-                    midTerrace.position.y = 11.25;
-                    tower.add(midTerrace);
-
-                    // 悬挑金色安全立柱
-                    const midFenceGeo = new THREE.CylinderGeometry(1.5, 1.5, 0.3, 12, 1, true);
-                    const midFence = new THREE.Mesh(midFenceGeo, goldMaterial);
-                    midFence.position.y = 11.55;
-                    tower.add(midFence);
-
-                    // 二阶收缩纤细塔柱
-                    const upperBodyGeo = new THREE.CylinderGeometry(0.9, 0.9, 5.0, 12);
-                    const upperBody = new THREE.Mesh(upperBodyGeo, wallMaterial);
-                    upperBody.position.y = 13.8;
-                    tower.add(upperBody);
-
-                    // 巍峨主尖顶 conical top
-                    const spireGeo = new THREE.ConeGeometry(1.0, 4.2, 12);
-                    const spire = new THREE.Mesh(spireGeo, roofMaterial);
-                    spire.position.y = 18.2;
-                    tower.add(spire);
-
-                    createFlag(0, 20.3, 0, tower);
-
-                    // 1. 【倾斜哥特式飞扶壁支架 (连接后高塔与主殿，完美复刻原图)】
-                    const buttressGeo = new THREE.BoxGeometry(1.9, 0.3, 0.5);
-                    const buttress = new THREE.Mesh(buttressGeo, accentMaterial);
-                    // 空间架桥倾斜定位
-                    buttress.position.set(-xSide * 1.5, 9.2, 1.35);
-                    buttress.rotation.z = xSide * 0.42; 
-                    tower.add(buttress);
-
-                    // 2. 【高空跨接连接大拱桥 (一比一连廊设计)】
-                    // 连通大殿顶部 (0, 7.0, 0) 与高卫塔 (xSide * 4.6, 2.3+11, -3.4) 之间的空中交通
-                    createBridge(xSide * 4.6, -3.4, 0, 0, 10.5, rootPivot);
-
-                    // 错落窗格
-                    createGothicWindow(0, 8.0, 1.28, 0, tower);
-                    createGothicWindow(0, 14.5, 0.92, 0, tower);
-                    createGothicWindow(-xSide * 1.28, 4.8, 0, -xSide * Math.PI/2, tower);
-
-                    rootPivot.add(tower);
-                };
-                buildRearTower(-1);
-                buildRearTower(1);
-
-                // === E. 中央至尊双叠圣堂主钟楼 (Grand Central Keep Spires) ===
-                const grandTower = new THREE.Group();
-                grandTower.position.set(0, 7.8, 0); // 耸立于主殿天台
-
-                // 1. 八角形镂空回廊主殿堂
-                const coreBodyGeo = new THREE.CylinderGeometry(1.85, 1.95, 9.0, 8);
-                const coreBody = new THREE.Mesh(coreBodyGeo, wallMaterial);
-                coreBody.position.y = 4.5;
-                grandTower.add(coreBody);
-
-                // 环绕八角殿堂的 8 根皇家黄金雕花承重立柱 (增强图样细节)
-                for (let i = 0; i < 8; i++) {
-                    const angle = (i * Math.PI) / 4;
-                    const colGeo = new THREE.CylinderGeometry(0.13, 0.13, 9.0, 8);
-                    const col = new THREE.Mesh(colGeo, goldMaterial);
-                    col.position.set(Math.cos(angle) * 1.92, 4.5, Math.sin(angle) * 1.92);
-                    grandTower.add(col);
+                // 殿侧装饰性拱形柱肋
+                for (let i = -3.2; i <= 3.2; i += 1.6) {
+                    if (Math.abs(i) < 0.1) continue;
+                    const ribL = new THREE.Mesh(new THREE.BoxGeometry(0.15, 5.6, 0.4), goldMaterial);
+                    ribL.position.set(-3.52, 2.8, i);
+                    const ribR = new THREE.Mesh(new THREE.BoxGeometry(0.15, 5.6, 0.4), goldMaterial);
+                    ribR.position.set(3.52, 2.8, i);
+                    mainHallGroup.add(ribL, ribR);
+                    this.solidMeshes.push(ribL, ribR);
                 }
 
-                // 2. 至上露台与钟楼过渡
-                const clockTerraceGeo = new THREE.CylinderGeometry(2.15, 2.15, 0.65, 12);
-                const clockTerrace = new THREE.Mesh(clockTerraceGeo, accentMaterial);
-                clockTerrace.position.y = 9.3;
-                grandTower.add(clockTerrace);
+                // 主殿顶端倾斜人字尖脊屋瓦
+                const roofShape = new THREE.Shape();
+                roofShape.moveTo(-3.5, 0);
+                roofShape.lineTo(0, 3.5);
+                roofShape.lineTo(3.5, 0);
+                roofShape.closePath();
+                const roofExtSettings = { depth: 8.0, bevelEnabled: false };
+                const roofGeom = new THREE.ExtrudeGeometry(roofShape, roofExtSettings);
+                const roofMesh = new THREE.Mesh(roofGeom, roofMaterial);
+                // 完美套在主殿天花板
+                roofMesh.position.set(0, 5.6, -4.0);
+                mainHallGroup.add(roofMesh);
+                this.solidMeshes.push(roofMesh);
 
-                const clockFenceGeo = new THREE.CylinderGeometry(2.2, 2.2, 0.3, 12, 1, true);
-                const clockFence = new THREE.Mesh(clockFenceGeo, goldMaterial);
-                clockFence.position.y = 9.6;
-                grandTower.add(clockFence);
+                rootPivot.add(mainHallGroup);
 
-                // 二级收缩尖耸主殿
-                const topSpireBodyGeo = new THREE.CylinderGeometry(1.25, 1.25, 4.8, 8);
-                const topSpireBody = new THREE.Mesh(topSpireBodyGeo, wallMaterial);
-                topSpireBody.position.y = 11.8;
-                grandTower.add(topSpireBody);
+                // === D. 震撼前卫门廊与玫瑰窗（Grand Cathedral Portal & Rose Window） ===
+                const portalGroup = new THREE.Group();
+                portalGroup.position.set(0, 2.2, 6.4); // 探出门脸突出立体度
 
-                // 至尊主塔粉瓦尖尖
-                const masterRoofGeo = new THREE.ConeGeometry(1.4, 6.6, 12);
-                const masterRoof = new THREE.Mesh(masterRoofGeo, roofMaterial);
-                masterRoof.position.y = 17.3;
-                grandTower.add(masterRoof);
+                // 牌楼骨架
+                const portalBody = new THREE.Mesh(new THREE.BoxGeometry(3.8, 4.4, 1.2), porcelainMaterial);
+                portalBody.position.y = 2.2;
+                portalGroup.add(portalBody);
+                this.solidMeshes.push(portalBody);
 
-                createFlag(0, 20.6, 0, grandTower);
+                // 1:1 数学级哥特尖拱门廊套圈（三层同心缩进）
+                for (let i = 0; i < 3; i++) {
+                    const pW = 1.6 - i * 0.25;
+                    const pH = 2.4 - i * 0.2;
+                    const archShape = this.getGothicArchShape(pW, pH);
+                    const extrudeOpt = { depth: 0.18, bevelEnabled: true, bevelSize: 0.02, bevelThickness: 0.02, steps: 1 };
+                    const archGeo = new THREE.ExtrudeGeometry(archShape, extrudeOpt);
+                    const archMesh = new THREE.Mesh(archGeo, i === 0 ? goldMaterial : porcelainMaterial);
+                    archMesh.position.set(0, 0, 0.6 - i * 0.18);
+                    portalGroup.add(archMesh);
+                    this.solidMeshes.push(archMesh);
+                }
 
-                // 双重高密度窗棂点缀
-                createGothicWindow(-0.65, 4.8, 1.88, 0, grandTower);
-                createGothicWindow(0.65, 4.8, 1.88, 0, grandTower);
-                createGothicWindow(0, 12.0, 1.28, 0, grandTower);
+                // 发光的哥特主拱大门彩色窗
+                const mainDoorShape = this.getGothicArchShape(1.1, 2.0);
+                const mainDoorGeo = new THREE.ShapeGeometry(mainDoorShape);
+                const mainDoorMesh = new THREE.Mesh(mainDoorGeo, glassMaterial);
+                mainDoorMesh.position.set(0, 0, 0.1);
+                portalGroup.add(mainDoorMesh);
+                this.windowLights.push(mainDoorMesh);
 
-                keepGroup.add(grandTower);
+                // 牌楼顶部金色勾边三角山墙（Gabled Roofpediment）
+                const triangShape = new THREE.Shape();
+                triangShape.moveTo(-1.9, 0);
+                triangShape.lineTo(0, 2.4);
+                triangShape.lineTo(1.9, 0);
+                triangShape.closePath();
+                const triangGeo = new THREE.ExtrudeGeometry(triangShape, { depth: 0.2, bevelEnabled: false });
+                const triangMesh = new THREE.Mesh(triangGeo, porcelainMaterial);
+                triangMesh.position.set(0, 4.4, -0.4);
+                portalGroup.add(triangMesh);
+                this.solidMeshes.push(triangMesh);
 
-                // === F. 前置皇家樱粉凯旋拱门 ===
-                const frontGate = new THREE.Group();
-                frontGate.position.set(0, 0, 3.75);
+                const gableGoldL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.6, 0.22), goldMaterial);
+                gableGoldL.position.set(-0.95, 5.6, -0.3);
+                gableGoldL.rotation.z = 0.65;
+                const gableGoldR = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.6, 0.22), goldMaterial);
+                gableGoldR.position.set(0.95, 5.6, -0.3);
+                gableGoldR.rotation.z = -0.65;
+                portalGroup.add(gableGoldL, gableGoldR);
+                this.solidMeshes.push(gableGoldL, gableGoldR);
 
-                const gateFrameGeo = new THREE.BoxGeometry(3.3, 3.3, 0.65);
-                const gateFrame = new THREE.Mesh(gateFrameGeo, accentMaterial);
-                gateFrame.position.y = 1.65;
-                frontGate.add(gateFrame);
+                // 圣光玫瑰圆窗
+                const roseGeo = new THREE.CylinderGeometry(0.6, 0.6, 0.15, 24);
+                const roseMesh = new THREE.Mesh(roseGeo, glassMaterial);
+                roseMesh.rotation.x = Math.PI / 2;
+                roseMesh.position.set(0, 5.3, -0.15);
+                portalGroup.add(roseMesh);
+                this.windowLights.push(roseMesh);
 
-                // 金色包边拱圈
-                const gateArchGeo = new THREE.CylinderGeometry(1.15, 1.15, 0.85, 16, 1, false, 0, Math.PI);
-                const gateArch = new THREE.Mesh(gateArchGeo, goldMaterial);
-                gateArch.rotation.x = Math.PI / 2;
-                gateArch.position.set(0, 2.45, 0);
-                frontGate.add(gateArch);
+                // 玫瑰窗黄金雕花同心外圈
+                const roseBorder = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.05, 8, 24), goldMaterial);
+                roseBorder.position.set(0, 5.3, -0.06);
+                portalGroup.add(roseBorder);
+                this.solidMeshes.push(roseBorder);
 
-                // 奢华暗紫朱红大殿双掩门
-                const doorGeo = new THREE.BoxGeometry(0.98, 2.35, 0.12);
-                const doorL = new THREE.Mesh(doorGeo, new THREE.MeshStandardMaterial({color: 0x3d0f1e, roughness: 0.85}));
-                doorL.position.set(-0.5, 1.18, 0.1);
-                const doorR = new THREE.Mesh(doorGeo, new THREE.MeshStandardMaterial({color: 0x3d0f1e, roughness: 0.85}));
-                doorR.position.set(0.5, 1.18, 0.1);
-                frontGate.add(doorL, doorR);
+                rootPivot.add(portalGroup);
 
-                keepGroup.add(frontGate);
-                rootPivot.add(keepGroup);
+                // === E. 前置对称双矮卫塔（Front Guard Towers） ===
+                const buildFrontTurret = (xSide) => {
+                    const turret = new THREE.Group();
+                    turret.position.set(xSide * 4.4, 2.2, 5.0);
 
-                // 激活全组网格投射与阴影接收
+                    // 多阶白色瓷柱壁
+                    const t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 1.05, 4.0, 12), porcelainMaterial);
+                    t1.position.y = 2.0;
+                    turret.add(t1);
+
+                    // 挑出金色雕带
+                    const rim = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.3, 12), goldMaterial);
+                    rim.position.y = 4.0;
+                    turret.add(rim);
+
+                    // 尖耸白瓷高锥帽
+                    const sp = new THREE.Mesh(new THREE.ConeGeometry(1.05, 3.2, 12), roofMaterial);
+                    sp.position.y = 5.6;
+                    turret.add(sp);
+
+                    // 顶部可爱金色小旗
+                    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 8), goldMaterial);
+                    pole.position.y = 7.45;
+                    const fl = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.5, 4), new THREE.MeshStandardMaterial({ color: xSide < 0 ? 0xff4a5a : 0x00f5ff }));
+                    fl.rotation.z = Math.PI / 2;
+                    fl.position.set(0.2, 7.7, 0);
+                    turret.add(pole, fl);
+                    this.flags.push(fl);
+
+                    // 雕花采光窗
+                    createGothicWindow(xSide * 0.86, 2.2, 0, xSide * Math.PI / 2, 0.4, 0.8, turret);
+
+                    rootPivot.add(turret);
+                    this.solidMeshes.push(t1, rim, sp, pole);
+                };
+                buildFrontTurret(-1);
+                buildFrontTurret(1);
+
+                // === F. 中部对称多重壁挂拱耳塔（Middle Flank Turrets） ===
+                const buildMiddleSpire = (xSide) => {
+                    const spire = new THREE.Group();
+                    spire.position.set(xSide * 4.6, 2.2, -0.4);
+
+                    // 塔柱
+                    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.15, 5.5, 12), porcelainMaterial);
+                    body.position.y = 2.75;
+                    spire.add(body);
+
+                    // 金腰带
+                    const trim = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 0.15, 12), goldMaterial);
+                    trim.position.y = 5.5;
+                    spire.add(trim);
+
+                    // 圆台围网露台
+                    const balcony = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.45, 12), porcelainMaterial);
+                    balcony.position.y = 5.8;
+                    const balu = new THREE.Mesh(new THREE.CylinderGeometry(1.32, 1.32, 0.3, 12, 1, true), goldMaterial);
+                    balu.position.y = 6.15;
+                    spire.add(balcony, balu);
+
+                    // 收缩上段塔
+                    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 3.8, 12), porcelainMaterial);
+                    upper.position.y = 7.9;
+                    spire.add(upper);
+
+                    // 纤细锥顶
+                    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.86, 3.2, 12), roofMaterial);
+                    roof.position.y = 11.2;
+                    spire.add(roof);
+
+                    // 小旗
+                    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.8, 8), goldMaterial);
+                    pole.position.y = 13.1;
+                    const fl = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.45, 4), new THREE.MeshStandardMaterial({ color: xSide < 0 ? 0xffbf00 : 0xe03131 }));
+                    fl.rotation.z = Math.PI / 2;
+                    fl.position.set(0.18, 13.3, 0);
+                    spire.add(pole, fl);
+                    this.flags.push(fl);
+
+                    createGothicWindow(0, 8.0, 0.82, 0, 0.42, 0.9, spire, true);
+
+                    rootPivot.add(spire);
+                    this.solidMeshes.push(body, trim, balcony, balu, upper, roof, pole);
+                };
+                buildMiddleSpire(-1);
+                buildMiddleSpire(1);
+
+                // === G. 至尊！100%还原后置双子至尊圣殿大高塔（Double Master Spires） ===
+                const buildGrandMasterSpire = (xSide) => {
+                    const master = new THREE.Group();
+                    // 紧密靠拢在后侧
+                    master.position.set(xSide * 1.5, 2.2, -4.2);
+
+                    // 第一层：宏大的正八角型白瓷塔柱（比圆柱立体10倍）
+                    const f1 = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.35, 7.6, 8), porcelainMaterial);
+                    f1.position.y = 3.8;
+                    master.add(f1);
+
+                    // 八个角上的垂直凸出肋条支架（Buttresses），光影错落极致奢华
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (i * Math.PI) / 4;
+                        const but = new THREE.Mesh(new THREE.BoxGeometry(0.12, 7.6, 0.25), goldMaterial);
+                        but.position.set(Math.cos(angle) * 1.25, 3.8, Math.sin(angle) * 1.25);
+                        but.rotation.y = -angle;
+                        master.add(but);
+                        this.solidMeshes.push(but);
+                    }
+
+                    // 金色齿型冠环
+                    const f1Trim = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.22, 2.3), goldMaterial);
+                    f1Trim.position.y = 7.7;
+                    master.add(f1Trim);
+
+                    // 第二层：精致金色中空钟殿廊柱（Gallery）
+                    const f2 = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 4.4, 8), porcelainMaterial);
+                    f2.position.y = 10.0;
+                    master.add(f2);
+
+                    // 8根金色柱（1:1复刻彩带圆窗结构）
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (i * Math.PI) / 4;
+                        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 4.4, 8), goldMaterial);
+                        col.position.set(Math.cos(angle) * 0.95, 10.0, Math.sin(angle) * 0.95);
+                        master.add(col);
+                        this.solidMeshes.push(col);
+                    }
+
+                    // 钟殿深处的彩色发光主芯窗（光影质感拉满）
+                    const coreGlass = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 4.0, 8), glassMaterial);
+                    coreGlass.position.y = 10.0;
+                    master.add(coreGlass);
+                    this.windowLights.push(coreGlass);
+
+                    // 第三层：白瓷过度段
+                    const f3 = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.68, 2.8, 12), porcelainMaterial);
+                    f3.position.y = 13.6;
+                    master.add(f3);
+
+                    // 至尊高空纤细哥特尖瓦顶
+                    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.72, 5.5, 12), roofMaterial);
+                    roof.position.y = 17.75;
+                    master.add(roof);
+
+                    // 尖顶上细致纵向金色排条
+                    for (let i = 0; i < 6; i++) {
+                        const angle = (i * Math.PI) / 3;
+                        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.04, 5.5, 0.06), goldMaterial);
+                        rib.position.set(Math.cos(angle) * 0.35, 17.75, Math.sin(angle) * 0.35);
+                        rib.rotation.y = -angle;
+                        rib.rotation.z = -xSide * 0.06; // 向尖角略微倾斜
+                        master.add(rib);
+                        this.solidMeshes.push(rib);
+                    }
+
+                    // 金色风向十字冠华
+                    createTopCrest(0, 20.4, 0, master);
+
+                    // 阁楼装饰窗
+                    createGothicWindow(0, 13.6, 0.7, 0, 0.32, 0.75, master, true);
+
+                    rootPivot.add(master);
+                    this.solidMeshes.push(f1, f1Trim, f2, f3, roof);
+                };
+                buildGrandMasterSpire(-1);
+                buildGrandMasterSpire(1);
+
+                // === H. 远景极窄飞扶柱与高空拱形跨梁桥（Rear Flying Buttresses） ===
+                const buildRearSmallTurret = (xSide) => {
+                    const small = new THREE.Group();
+                    small.position.set(xSide * 4.8, 2.2, -5.0);
+
+                    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.68, 8.0, 10), porcelainMaterial);
+                    body.position.y = 4.0;
+                    small.add(body);
+
+                    const roof = new THREE.Mesh(new THREE.ConeGeometry(0.68, 2.8, 10), roofMaterial);
+                    roof.position.y = 9.4;
+                    small.add(roof);
+
+                    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.7, 8), goldMaterial);
+                    pole.position.y = 10.8;
+                    const fl = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.4, 4), new THREE.MeshStandardMaterial({ color: 0xda70d6 }));
+                    fl.rotation.z = Math.PI / 2;
+                    fl.position.set(0.15, 11.0, 0);
+                    small.add(pole, fl);
+                    this.flags.push(fl);
+
+                    rootPivot.add(small);
+                    this.solidMeshes.push(body, roof, pole);
+
+                    // 1:1复刻飞扶连廊：从后方高塔架设彩虹金石拱梁，连通到侧翼耳塔
+                    const bridge = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.28, 0.45), porcelainMaterial);
+                    bridge.position.set(xSide * 3.1, 8.0, -4.5);
+                    bridge.rotation.z = -xSide * 0.28; 
+                    const bridgeTrim = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.08, 0.48), goldMaterial);
+                    bridgeTrim.position.set(xSide * 3.1, 8.16, -4.5);
+                    bridgeTrim.rotation.z = -xSide * 0.28;
+                    rootPivot.add(bridge, bridgeTrim);
+                    this.solidMeshes.push(bridge, bridgeTrim);
+                };
+                buildRearSmallTurret(-1);
+                buildRearSmallTurret(1);
+
+                // 统一开启高精度动态投影映射
                 this.castleGroup.traverse(node => {
                     if (node.isMesh) {
                         node.castShadow = true;
@@ -677,14 +858,13 @@
                 });
             }
 
-            // --- 3D 魔法六芒星法阵 (铺在平地 `-7.5` 基准线上) ---
+            // --- 3D 魔法六芒星法阵（铺于底座上方 `-6.32` 切面，100%抗闪烁遮挡） ---
             buildMagicCircle() {
                 const circleGroup = new THREE.Group();
-                // 置于城堡底部底座上方微小偏移面，防止深度遮挡闪烁
-                circleGroup.position.set(0, -7.35, 0);
+                circleGroup.position.set(0, -6.32, 0);
 
-                const ringGeoOuter = new THREE.RingGeometry(8.6, 8.8, 64);
-                const ringGeoInner = new THREE.RingGeometry(7.6, 7.7, 64);
+                const ringGeoOuter = new THREE.RingGeometry(9.0, 9.2, 64);
+                const ringGeoInner = new THREE.RingGeometry(8.0, 8.1, 64);
                 const lineMat = new THREE.MeshBasicMaterial({
                     color: PALETTE.gold,
                     side: THREE.DoubleSide,
@@ -702,7 +882,7 @@
                 const starPoints = [];
                 for (let i = 0; i < 6; i++) {
                     const angle = (i * Math.PI) / 3;
-                    starPoints.push(new THREE.Vector3(Math.cos(angle) * 7.6, 0, Math.sin(angle) * 7.6));
+                    starPoints.push(new THREE.Vector3(Math.cos(angle) * 8.0, 0, Math.sin(angle) * 8.0));
                 }
 
                 const lineGeom1 = new THREE.BufferGeometry().setFromPoints([
@@ -725,11 +905,11 @@
 
                 circleGroup.add(starLine1, starLine2);
 
-                // 六顶点发光球
+                // 六顶点魔法水晶球
                 for (let i = 0; i < 6; i++) {
-                    const sphereGeo = new THREE.SphereGeometry(0.22, 16, 16);
+                    const sphereGeo = new THREE.SphereGeometry(0.24, 16, 16);
                     const sphereMat = new THREE.MeshBasicMaterial({
-                        color: PALETTE.white,
+                        color: 0xffffff,
                         transparent: true,
                         opacity: 0
                     });
@@ -744,9 +924,9 @@
                 this.magicStarMaterial = starLine1.material;
             }
 
-            // --- 飘落环境微星颗粒群 ---
+            // --- 飘落环境微金微光星尘 ---
             buildFallingStars() {
-                const count = 150;
+                const count = 180;
                 const geometry = new THREE.BufferGeometry();
                 const positions = new Float32Array(count * 3);
                 
@@ -759,9 +939,10 @@
                 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
                 const material = new THREE.PointsMaterial({
                     size: 0.15,
-                    color: 0xffffff,
+                    color: 0xffe57f,
                     transparent: true,
-                    opacity: 0.4
+                    opacity: 0.5,
+                    blending: THREE.AdditiveBlending
                 });
 
                 this.fallingStars = new THREE.Points(geometry, material);
@@ -791,8 +972,8 @@
                 this.lastTime = performance.now();
                 this.isPlaying = true;
 
-                // 物理重置为初始埋藏状态 Y = -29
-                this.castleGroup.position.y = -29; 
+                // 初始状态：城堡深埋于地下 Y = -30，强制所有白色和金色模型处于淡入透明模式
+                this.castleGroup.position.y = -30; 
                 this.castleGroup.traverse(node => {
                     if (node.isMesh && node.material) {
                         node.material.transparent = true;
@@ -800,11 +981,11 @@
                     }
                 });
 
+                // 重置窗户发光状态
                 this.windowLights.forEach(win => {
-                    win.material.color.setHex(0x140a20);
+                    win.material.emissiveIntensity = 0.05;
                 });
 
-                // 重置烟花和流萤
                 this.initConvergeParticles();
                 this.fireworks.forEach(f => this.scene.remove(f.points));
                 this.fireworks = [];
@@ -812,25 +993,25 @@
                 this.leftFireworkTriggered = false;
                 this.rightFireworkTriggered = false;
                 this.centerFireworkTriggered = false;
+                this.solidStateLocked = false;
             }
 
-            // 0s - 1.5s 开场汇聚粒子系统建立
+            // 金光气旋汇聚
             initConvergeParticles() {
                 if (this.convergeParticles) this.scene.remove(this.convergeParticles);
 
-                const count = 350;
+                const count = 420;
                 const geometry = new THREE.BufferGeometry();
                 const positions = new Float32Array(count * 3);
                 this.convergeData = [];
 
-                // 精确汇聚到城堡重心微偏上 (0, -4.0, 0)
                 const targetY = -4.0; 
                 for (let i = 0; i < count; i++) {
                     const angle = Math.random() * Math.PI * 2;
-                    const radius = 25 + Math.random() * 15;
+                    const radius = 24 + Math.random() * 12;
                     const x = Math.cos(angle) * radius;
                     const z = Math.sin(angle) * radius;
-                    const y = (Math.random() - 0.5) * 15 + 10;
+                    const y = (Math.random() - 0.5) * 15 + 8;
 
                     positions[i*3] = x;
                     positions[i*3+1] = y;
@@ -839,7 +1020,7 @@
                     this.convergeData.push({
                         startX: x, startY: y, startZ: z,
                         targetX: 0, targetY: targetY, targetZ: 0,
-                        speed: 0.6 + Math.random() * 0.8
+                        speed: 0.7 + Math.random() * 0.7
                     });
                 }
 
@@ -856,9 +1037,9 @@
                 this.scene.add(this.convergeParticles);
             }
 
-            // --- 3D 物理烟花绽放系统 (空气动力学膨胀、尾迹重力坠落) ---
+            // 三维空气动力学物理烟花系统
             spawnFirework(x, y, z) {
-                const count = 220; 
+                const count = 260; 
                 const geometry = new THREE.BufferGeometry();
                 const positions = new Float32Array(count * 3);
                 const velocities = [];
@@ -868,7 +1049,7 @@
                 for (let i = 0; i < count; i++) {
                     const theta = Math.random() * Math.PI * 2;
                     const phi = Math.acos((Math.random() * 2) - 1);
-                    const speed = 2.5 + Math.random() * 7.5; 
+                    const speed = 2.0 + Math.random() * 8.0; 
 
                     const vx = Math.sin(phi) * Math.cos(theta) * speed;
                     const vy = Math.sin(phi) * Math.sin(theta) * speed;
@@ -883,7 +1064,7 @@
 
                 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
                 const material = new THREE.PointsMaterial({
-                    size: 0.32,
+                    size: 0.35,
                     color: color,
                     transparent: true,
                     opacity: 1.0,
@@ -898,11 +1079,10 @@
                     velocities: velocities,
                     opacity: 1.0,
                     life: 1.0,
-                    decay: 0.013 + Math.random() * 0.008 
+                    decay: 0.012 + Math.random() * 0.008 
                 });
             }
 
-            // 更新物理烟花系统
             updateFireworks() {
                 for (let f = this.fireworks.length - 1; f >= 0; f--) {
                     const fw = this.fireworks[f];
@@ -912,11 +1092,8 @@
                     for (let i = 0; i < fw.velocities.length; i++) {
                         const vel = fw.velocities[i];
                         
-                        // 1. 模拟空气摩擦阻力衰减
-                        vel.multiplyScalar(0.955);
-
-                        // 2. 真实落体重力加速度
-                        vel.y -= 0.13; 
+                        vel.multiplyScalar(0.96); // 空气摩擦
+                        vel.y -= 0.12;            // 重力加速下坠
 
                         positions[i*3] += vel.x * 0.05;
                         positions[i*3+1] += vel.y * 0.05;
@@ -926,7 +1103,6 @@
                     fw.points.geometry.attributes.position.needsUpdate = true;
                     fw.points.material.opacity = fw.life;
 
-                    // 超越寿命销毁回收
                     if (fw.life <= 0) {
                         this.scene.remove(fw.points);
                         this.fireworks.splice(f, 1);
@@ -934,7 +1110,7 @@
                 }
             }
 
-            // 状态机核心时间轴控制
+            // 状态机时间轴主循环
             update(now) {
                 if (!this.isPlaying) return;
 
@@ -944,7 +1120,6 @@
 
                 const t = this.timeline;
 
-                // 强制12秒关停重置
                 if (t >= 12.0) {
                     this.timeline = 12.0;
                     this.isPlaying = false;
@@ -955,9 +1130,9 @@
 
                 document.getElementById('hud-timer').textContent = `${t.toFixed(1)}s / 12.0s`;
 
-                // 🕒 0.0s - 1.5s 【开场粒子汇聚】
+                // 🕒 0.0s - 1.5s 【金色气旋粒子汇聚】
                 if (t < 1.5) {
-                    document.getElementById('hud-title').textContent = "开场金色粒子汇聚中...";
+                    document.getElementById('hud-title').textContent = "皇家金尘，粒子交织汇聚中...";
                     const progress = t / 1.5;
                     const positions = this.convergeParticles.geometry.attributes.position.array;
 
@@ -969,46 +1144,41 @@
                         positions[i*3+2] = THREE.MathUtils.lerp(d.startZ, d.targetZ, curP);
                     }
                     this.convergeParticles.geometry.attributes.position.needsUpdate = true;
-                    this.convergeParticles.material.opacity = 1 - progress;
+                    this.convergeParticles.material.opacity = 1.0 - progress;
 
-                    // 1.45s 汇聚爆破点稍上移到法阵中心
                     if (t >= 1.45) {
                         this.scene.remove(this.convergeParticles);
                         this.spawnFirework(0, -4, 0); 
                     }
                 }
 
-                // 🕒 1.5s - 3.0s 【金色魔法六芒星法阵展开】
+                // 🕒 1.5s - 3.0s 【黄金六芒星唤醒展开】
                 if (t >= 1.5 && t < 3.0) {
-                    document.getElementById('hud-title').textContent = "魔法六芒星法阵唤醒...";
+                    document.getElementById('hud-title').textContent = "黄金法阵，破空唤醒...";
                     const progress = (t - 1.5) / 1.5;
                     const scale = this.easeOutBack(progress);
                     
-                    this.magicCircleScale = scale;
                     this.magicCircle.scale.set(scale, 1, scale);
-                    
                     this.magicCircleMaterial.opacity = Math.min(1.0, progress * 1.5);
                     this.magicStarMaterial.opacity = Math.min(1.0, progress * 1.5);
 
-                    // 顶点光球显示
                     this.magicCircle.children.forEach(child => {
                         if (child.isMesh) child.material.opacity = Math.min(1.0, progress * 1.5);
                     });
                 }
 
-                // 魔法阵地表自转
+                // 地表法阵自转
                 if (t >= 1.5 && this.magicCircle) {
-                    this.magicCircle.rotation.y += 0.015;
+                    this.magicCircle.rotation.y += 0.012;
                 }
 
-                // 🕒 3.0s - 6.0s 【粉白古堡破空升起】
+                // 🕒 3.0s - 6.0s 【城堡惊艳破地拔起】
                 if (t >= 3.0 && t < 6.0) {
-                    document.getElementById('hud-title').textContent = "3D粉白城堡，自星空升起...";
+                    document.getElementById('hud-title').textContent = "史诗皇家城堡，自虚空升起...";
                     const progress = (t - 3.0) / 2.0; 
                     if (progress >= 0 && progress <= 1.0) {
                         const ease = this.easeOutBack(progress);
-                        // 自下抬升，最终回归 Y=0 (绝对重心居中)
-                        this.castleGroup.position.y = -29 * (1 - ease); 
+                        this.castleGroup.position.y = -30 * (1 - ease); 
                         
                         this.castleGroup.traverse(node => {
                             if (node.isMesh && node.material) {
@@ -1017,63 +1187,68 @@
                         });
                     } else {
                         this.castleGroup.position.y = 0;
-                        this.castleGroup.traverse(node => {
-                            if (node.isMesh && node.material) node.material.opacity = 1.0;
-                        });
                     }
                 }
 
-                // 旗帜微风物理动态模拟 (Waving flags)
-                if (this.flags.length > 0) {
-                    this.flags.forEach((flag, index) => {
-                        flag.rotation.x = Math.sin(now * 0.008 + index) * 0.15;
-                        flag.rotation.y = Math.cos(now * 0.005 + index) * 0.1;
+                // 【核心突破：6秒升起完毕后，立即锁死白瓷/黄金的透明度，断绝深度排序混乱Bug，实现雕刻光影效果】
+                if (t >= 5.9 && !this.solidStateLocked) {
+                    this.solidStateLocked = true;
+                    this.castleGroup.position.y = 0;
+                    this.solidMeshes.forEach(mesh => {
+                        mesh.material.transparent = false;
+                        mesh.material.opacity = 1.0;
+                        mesh.material.needsUpdate = true;
                     });
                 }
 
-                // 🕒 6.0s - 8.0s 【暖色密集窗户渐次点亮】
+                // 微风小旌旗波动摆动模拟
+                if (this.flags.length > 0) {
+                    this.flags.forEach((flag, index) => {
+                        flag.rotation.x = Math.sin(now * 0.009 + index) * 0.18;
+                        flag.rotation.y = Math.cos(now * 0.006 + index) * 0.12;
+                    });
+                }
+
+                // 🕒 6.0s - 8.0s 【彩色窗棂炽烈点亮】
                 if (t >= 6.0 && t < 8.0) {
-                    document.getElementById('hud-title').textContent = "皇家殿堂，窗棂渐次点亮...";
-                    const progress = (t - 6.0) / 1.2; 
+                    document.getElementById('hud-title').textContent = "斑斓圣殿，彩虹窗棂炫然点亮...";
+                    const progress = (t - 6.0) / 1.5; 
                     this.windowLights.forEach((win, index) => {
                         const delayOffset = (index / this.windowLights.length) * 0.8;
                         if (progress >= delayOffset) {
-                            win.material.color.lerp(new THREE.Color(PALETTE.yellow), 0.12);
+                            win.material.emissiveIntensity = THREE.MathUtils.lerp(0.05, 1.4, (progress - delayOffset) * 2.0);
                         }
                     });
                 }
 
-                // 🕒 8.0s - 10.5s 【三维物理烟花绽放】
+                // 🕒 8.0s - 10.5s 【漫天物理烟花华丽盛宴】
                 if (t >= 8.0 && t < 10.5) {
-                    document.getElementById('hud-title').textContent = "浪漫星原，漫天烟花盛宴...";
+                    document.getElementById('hud-title').textContent = "浪漫星原，物理烟花奢华绽放...";
                     
-                    // 基于城堡 Y 重心向下平移，重置 3D 空间烟花位置
-                    // 8.0s 第一波烟花 (城堡左上方)
                     if (t >= 8.0 && t < 8.05 && !this.leftFireworkTriggered) {
                         this.leftFireworkTriggered = true;
-                        this.spawnFirework(-10, 8, -4);
+                        this.spawnFirework(-13, 9, -2);
                     }
 
-                    // 8.6s 第二波烟花 (城堡右上方)
                     if (t >= 8.6 && t < 8.65 && !this.rightFireworkTriggered) {
                         this.rightFireworkTriggered = true;
-                        this.spawnFirework(10, 8, -4);
+                        this.spawnFirework(13, 9, -2);
                     }
 
-                    // 9.2s 第三波烟花 (主尖顶正上方)
                     if (t >= 9.2 && t < 9.25 && !this.centerFireworkTriggered) {
                         this.centerFireworkTriggered = true;
-                        this.spawnFirework(0, 16, 0); 
+                        this.spawnFirework(0, 18, -4); 
                     }
                 }
 
-                // 🕒 10.5s - 12.0s 【谢幕消散】
+                // 🕒 10.5s - 12.0s 【全景完美消散谢幕】
                 if (t >= 10.5) {
-                    document.getElementById('hud-title').textContent = "星华谢幕，繁星缓缓消逝...";
+                    document.getElementById('hud-title').textContent = "星华散落，皇家盛宴缓缓落幕...";
                     const fade = (t - 10.5) / 1.5;
 
                     this.castleGroup.traverse(node => {
                         if (node.isMesh && node.material) {
+                            node.material.transparent = true;
                             node.material.opacity = Math.max(0, 1.0 - fade);
                         }
                     });
@@ -1084,12 +1259,12 @@
                     }
                 }
 
-                // 更新环境飘雪
+                // 环境飘雪更新
                 if (this.fallingStars) {
                     const positions = this.fallingStars.geometry.attributes.position.array;
                     for (let i = 1; i < positions.length; i += 3) {
-                        positions[i] -= 0.12; 
-                        if (positions[i] < -15) positions[i] = 30; // 重设循环高度，贴合平移后新视口
+                        positions[i] -= 0.14; 
+                        if (positions[i] < -15) positions[i] = 30; 
                     }
                     this.fallingStars.geometry.attributes.position.needsUpdate = true;
                 }
@@ -1105,11 +1280,10 @@
                 return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
             }
 
-            // 电影级别的相机摇移轨迹
+            // 电影质感高角度运镜
             autoRotateCamera() {
                 if (!this.isPlaying) {
-                    // 非播放期缓慢匀速环绕
-                    const speed = 0.0022;
+                    const speed = 0.0025;
                     const x = this.camera.position.x;
                     const z = this.camera.position.z;
                     this.camera.position.x = x * Math.cos(speed) - z * Math.sin(speed);
@@ -1117,24 +1291,23 @@
                 } else {
                     const t = this.timeline;
                     const aspect = window.innerWidth / window.innerHeight;
-                    const baseZ = aspect < 1.0 ? 52 : 42; // 移动端竖屏拉远防切边
+                    const baseZ = aspect < 1.0 ? 46 : 36; 
 
                     if (t > 0 && t < 3.0) {
-                        // 开场及法阵环视
-                        this.camera.position.lerp(new THREE.Vector3(0, 15, baseZ), 0.025);
+                        // 开场仰视气旋
+                        this.camera.position.lerp(new THREE.Vector3(0, 10, baseZ), 0.03);
                     } else if (t >= 3.0 && t < 8.0) {
-                        // 随着城堡抬升，缓慢移动到右前方 45 度侧角，极具立体气魄
-                        this.camera.position.lerp(new THREE.Vector3(6, 6, baseZ - 8), 0.015);
+                        // 随着城堡缓缓升起，镜头平移到侧前方 25 度高位角，极具立体美感
+                        this.camera.position.lerp(new THREE.Vector3(7, 9, baseZ - 4), 0.015);
                     } else if (t >= 8.0) {
-                        // 烟花展示，镜头后撤进入全景宏观仰视
-                        this.camera.position.lerp(new THREE.Vector3(-12, 18, baseZ + 4), 0.02);
+                        // 烟花绽放，大幅后撤展现壮丽天空
+                        this.camera.position.lerp(new THREE.Vector3(-12, 14, baseZ + 4), 0.02);
                     }
                 }
-                // 【锁定聚焦目标为世界重心 (0, -2, 0)，确保手机全高绝对正居中，不偏离视窗】
-                this.camera.lookAt(0, -2, 0); 
+                // 镜头永远锁在城堡世界重心
+                this.camera.lookAt(0, -1, 0); 
             }
 
-            // 三维帧循环
             animate() {
                 const now = performance.now();
                 

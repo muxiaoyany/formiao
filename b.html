@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D梦幻城堡 - 抖音直播礼物特效还原</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- 引入优雅的中英文字体组合 -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Noto+Serif+SC:wght@300;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #05020a;
+            font-family: 'Noto Serif SC', 'Cinzel', serif;
+            color: #e2e8f0;
+        }
+
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        /* 极简磨砂全息控制面板 */
+        .hud-overlay {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            pointer-events: auto;
+            background: rgba(13, 5, 32, 0.5);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px rgba(255, 105, 180, 0.25) solid;
+            border-radius: 30px;
+            padding: 10px 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6), inset 0 0 15px rgba(255, 105, 180, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .hud-overlay:hover {
+            border-color: rgba(255, 105, 180, 0.5);
+            box-shadow: 0 10px 40px rgba(255, 105, 180, 0.15);
+        }
+
+        .gift-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .gift-icon {
+            font-size: 24px;
+            animation: bounce 2s infinite alternate;
+        }
+
+        .gift-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .gift-title {
+            font-family: 'Cinzel', serif;
+            font-weight: 900;
+            font-size: 14px;
+            color: #ffb6c1;
+            letter-spacing: 2px;
+            text-shadow: 0 0 8px rgba(255, 105, 180, 0.5);
+        }
+
+        .gift-status {
+            font-size: 10px;
+            color: rgba(226, 232, 240, 0.6);
+            letter-spacing: 1px;
+            margin-top: 2px;
+        }
+
+        /* 重播控制按钮 */
+        .control-btn {
+            background: rgba(255, 105, 180, 0.1);
+            border: 1px rgba(255, 105, 180, 0.3) solid;
+            color: #ffb6c1;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 11px;
+            cursor: pointer;
+            font-family: 'Noto Serif SC', serif;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 105, 180, 0.25);
+            border-color: #ffb6c1;
+            box-shadow: 0 0 15px rgba(255, 105, 180, 0.3);
+            transform: translateY(-1px);
+        }
+
+        /* 引导遮罩界面 */
+        .intro-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(13, 5, 32, 0.95);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.8s ease;
+        }
+
+        .intro-screen.hide {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .castle-logo {
+            font-size: 72px;
+            filter: drop-shadow(0 0 20px rgba(255, 105, 180, 0.6));
+            margin-bottom: 20px;
+            animation: float 4s ease-in-out infinite;
+        }
+
+        .intro-title {
+            font-family: 'Cinzel', serif;
+            font-size: 28px;
+            font-weight: 900;
+            color: #ffb6c1;
+            letter-spacing: 4px;
+            text-shadow: 0 0 15px rgba(255, 105, 180, 0.5);
+            margin-bottom: 8px;
+        }
+
+        .intro-subtitle {
+            font-size: 13px;
+            color: rgba(226, 232, 240, 0.6);
+            letter-spacing: 2px;
+            margin-bottom: 30px;
+        }
+
+        .start-btn {
+            background: linear-gradient(135deg, #ffb6c1, #ff69b4);
+            border: none;
+            color: #0d0520;
+            padding: 14px 40px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            letter-spacing: 3px;
+            box-shadow: 0 10px 25px rgba(255, 105, 180, 0.4);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .start-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 15px 30px rgba(255, 105, 180, 0.6);
+        }
+
+        @keyframes bounce {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-5px); }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-10px) rotate(3deg); }
+        }
+    </style>
+
+    <!-- 导入 Three.js 及 OrbitControls 轨道控制器 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <!-- 引导界面 -->
+    <div class="intro-screen" id="intro-screen">
+        <div class="castle-logo">🏰</div>
+        <h1 class="intro-title">ROYAL PINK & WHITE CASTLE</h1>
+        <p class="intro-subtitle">3D 哥特梦幻城堡 · 豪华烟花绽放特效</p>
+        <button class="start-btn" id="start-btn">开启奢华 3D 星空</button>
+    </div>
+
+    <!-- 顶端悬浮 HUD -->
+    <div class="hud-overlay">
+        <div class="gift-info">
+            <span class="gift-icon">🏰</span>
+            <div class="gift-text">
+                <span class="gift-title" id="hud-title">等待开启...</span>
+                <span class="gift-status" id="hud-timer">0.0s / 12.0s</span>
+            </div>
+        </div>
+        <button class="control-btn" id="replay-btn">手动重播</button>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        // =========================================================================
+        // 《3D 皇家梦幻城堡与物理烟花》引擎与渲染管线
+        // =========================================================================
+
+        const PALETTE = {
+            pink: 0xffb6c1,
+            hotPink: 0xff69b4,
+            white: 0xffffff,
+            cream: 0xfffcf5,
+            gold: 0xffd700,
+            yellow: 0xfff3cc,
+            bgTop: 0x080415,
+            bgBottom: 0x150b25,
+            fireworks: [0xff3f5f, 0x2e5cff, 0x9b4fff, 0xff529b, 0xffd700, 0x00e1d9]
+        };
+
+        class Gift3DEngine {
+            constructor() {
+                this.container = document.getElementById('canvas-container');
+                
+                // 动效核心时间轴
+                this.timeline = 0;
+                this.lastTime = performance.now();
+                this.isPlaying = false;
+
+                // 3D 场景、相机、渲染器初始化
+                this.scene = new THREE.Scene();
+                this.scene.fog = new THREE.FogExp2(0x080415, 0.012);
+
+                this.camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(0, 18, 42);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.setClearColor(PALETTE.bgTop, 1);
+                this.container.appendChild(this.renderer.domElement);
+
+                // 轨道控制器
+                this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+                this.controls.enableDamping = true;
+                this.controls.dampingFactor = 0.05;
+                this.controls.maxPolarAngle = Math.PI / 2 - 0.05; // 限制不能到地平线以下
+                this.controls.minDistance = 15;
+                this.controls.maxDistance = 120;
+
+                // 实体群组
+                this.castleGroup = new THREE.Group();
+                this.scene.add(this.castleGroup);
+                this.castleYTarget = 0;
+
+                this.magicCircle = null;
+                this.windowLights = [];
+                this.flags = []; // 用于风吹动摆动的旗帜几何
+                this.fireworks = []; // 烟花物理粒子数组
+
+                // 特效辅助元素
+                this.convergeParticles = null;
+                this.fallingStars = null;
+
+                this.setupLights();
+                this.buildCastle();
+                this.buildMagicCircle();
+                this.buildFallingStars();
+                this.bindEvents();
+
+                // 启动动画主循环
+                window.onload = () => {
+                    this.animate();
+                };
+            }
+
+            setupLights() {
+                // 环境底光
+                const ambientLight = new THREE.AmbientLight(0x281944, 1.4);
+                this.scene.add(ambientLight);
+
+                // 主平行光源 (侧向粉金色高光)
+                this.dirLight = new THREE.DirectionalLight(0xffb6c1, 1.8);
+                this.dirLight.position.set(15, 25, 20);
+                this.dirLight.castShadow = true;
+                this.scene.add(this.dirLight);
+
+                // 辅助补光源 (冷色调)
+                this.fillLight = new THREE.DirectionalLight(0x4080ff, 0.8);
+                this.fillLight.position.set(-15, 10, -10);
+                this.scene.add(this.fillLight);
+
+                // 顶部聚光灯
+                this.spotLight = new THREE.SpotLight(0xffffff, 2.5);
+                this.spotLight.position.set(0, 45, 0);
+                this.spotLight.angle = Math.PI / 3;
+                this.spotLight.penumbra = 0.9;
+                this.scene.add(this.spotLight);
+            }
+
+            // --- 精密3D城堡模型构建 (Gothic粉白黄金拼接风格) ---
+            buildCastle() {
+                // 材质材质定义
+                const wallMaterial = new THREE.MeshStandardMaterial({
+                    color: PALETTE.cream,
+                    roughness: 0.35,
+                    metalness: 0.1,
+                    flatShading: false
+                });
+
+                const roofMaterial = new THREE.MeshStandardMaterial({
+                    color: PALETTE.pink,
+                    roughness: 0.25,
+                    metalness: 0.15,
+                    flatShading: false
+                });
+
+                const accentMaterial = new THREE.MeshStandardMaterial({
+                    color: PALETTE.hotPink,
+                    roughness: 0.3,
+                    metalness: 0.1
+                });
+
+                const goldMaterial = new THREE.MeshStandardMaterial({
+                    color: PALETTE.gold,
+                    roughness: 0.15,
+                    metalness: 0.85
+                });
+
+                // 用于存储光源窗户的材质
+                const windowOffMaterial = new THREE.MeshBasicMaterial({ color: 0x140a20 });
+
+                // 1. 辅助建造器：带有精美线框窗格的哥特式拱窗
+                const createGothicWindow = (x, y, z, rotY, parent) => {
+                    const winGroup = new THREE.Group();
+                    winGroup.position.set(x, y, z);
+                    winGroup.rotation.y = rotY;
+
+                    // 拱形窗洞背板 (发光片)
+                    const backGeo = new THREE.BoxGeometry(0.35, 0.65, 0.05);
+                    const back = new THREE.Mesh(backGeo, windowOffMaterial.clone());
+                    winGroup.add(back);
+                    this.windowLights.push(back); // 登记以便稍后点亮
+
+                    // 金色拱窗外边缘围栏
+                    const frameGeo = new THREE.BoxGeometry(0.42, 0.72, 0.06);
+                    const frame = new THREE.Mesh(frameGeo, goldMaterial);
+                    frame.position.z = -0.01;
+                    winGroup.add(frame);
+
+                    parent.add(winGroup);
+                };
+
+                // 2. 辅助建造器：飘扬的旗帜
+                const createFlag = (x, y, z, parent) => {
+                    const poleGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.5, 8);
+                    const pole = new THREE.Mesh(poleGeo, goldMaterial);
+                    pole.position.set(x, y + 0.75, z);
+                    parent.add(pole);
+
+                    // 旗帜面 (用三角锥模拟几何)
+                    const flagGeo = new THREE.ConeGeometry(0.4, 0.8, 4);
+                    const flag = new THREE.Mesh(flagGeo, accentMaterial);
+                    flag.rotation.z = Math.PI / 2;
+                    flag.position.set(x + 0.35, y + 1.2, z);
+                    parent.add(flag);
+                    this.flags.push(flag); // 注册用于在物理循环中抖动
+                };
+
+                // === A. 巍峨城堡大底座 (Octagonal Double Base) ===
+                const baseGroup = new THREE.Group();
+                const baseGeo1 = new THREE.CylinderGeometry(8.5, 9, 1.2, 8);
+                const b1 = new THREE.Mesh(baseGeo1, wallMaterial);
+                b1.position.y = 0.6;
+                baseGroup.add(b1);
+
+                const baseGeo2 = new THREE.CylinderGeometry(7.2, 7.8, 0.8, 8);
+                const b2 = new THREE.Mesh(baseGeo2, accentMaterial);
+                b2.position.y = 1.6;
+                baseGroup.add(b2);
+                this.castleGroup.add(baseGroup);
+
+                // === B. 主殿 Keep (白色多面大殿 & 城墙城垛) ===
+                const keepGroup = new THREE.Group();
+                keepGroup.position.y = 2.0;
+
+                const mainHallGeo = new THREE.BoxGeometry(7, 5, 7);
+                const mainHall = new THREE.Mesh(mainHallGeo, wallMaterial);
+                mainHall.position.y = 2.5;
+                keepGroup.add(mainHall);
+
+                // 精美金线修边
+                const trimGeo = new THREE.BoxGeometry(7.15, 0.25, 7.15);
+                const trim = new THREE.Mesh(trimGeo, goldMaterial);
+                trim.position.y = 5;
+                keepGroup.add(trim);
+
+                // 哥特式女墙城垛装饰
+                for (let i = -3.2; i <= 3.2; i += 1.6) {
+                    const battlementGeo = new THREE.BoxGeometry(0.8, 0.6, 0.3);
+                    const bL = new THREE.Mesh(battlementGeo, accentMaterial);
+                    bL.position.set(i, 5.3, 3.4);
+                    const bR = new THREE.Mesh(battlementGeo, accentMaterial);
+                    bR.position.set(i, 5.3, -3.4);
+                    keepGroup.add(bL, bR);
+                }
+
+                // 主殿正面拱窗
+                createGothicWindow(-1.8, 2.5, 3.52, 0, keepGroup);
+                createGothicWindow(1.8, 2.5, 3.52, 0, keepGroup);
+
+                // === C. 华丽前哨双护卫塔 (Front Flanking Towers) ===
+                const buildFrontTower = (xSide) => {
+                    const tower = new THREE.Group();
+                    tower.position.set(xSide * 4.6, 2.0, 3);
+
+                    // 多段式塔身
+                    const towerBodyGeo = new THREE.CylinderGeometry(1.0, 1.2, 7.5, 12);
+                    const towerBody = new THREE.Mesh(towerBodyGeo, wallMaterial);
+                    towerBody.position.y = 3.75;
+                    tower.add(towerBody);
+
+                    // 金色腰线环
+                    const midRingGeo = new THREE.CylinderGeometry(1.15, 1.15, 0.2, 12);
+                    const midRing = new THREE.Mesh(midRingGeo, goldMaterial);
+                    midRing.position.y = 4.5;
+                    tower.add(midRing);
+
+                    // 露台
+                    const terraceGeo = new THREE.CylinderGeometry(1.3, 1.3, 0.4, 12);
+                    const terrace = new THREE.Mesh(terraceGeo, accentMaterial);
+                    terrace.position.y = 7.6;
+                    tower.add(terrace);
+
+                    // 纤细锥形塔顶
+                    const spireGeo = new THREE.ConeGeometry(1.35, 4.2, 12);
+                    const spire = new THREE.Mesh(spireGeo, roofMaterial);
+                    spire.position.y = 9.8;
+                    tower.add(spire);
+
+                    // 双层黄金顶饰和旗帜
+                    createFlag(0, 11.9, 0, tower);
+
+                    // 塔窗布置
+                    createGothicWindow(0, 5.5, 1.02, 0, tower);
+                    createGothicWindow(xSide * 1.02, 3.5, 0, xSide * Math.PI/2, tower);
+
+                    this.castleGroup.add(tower);
+                };
+                buildFrontTower(-1);
+                buildFrontTower(1);
+
+                // === D. 后侧至高飞扶壁主角塔 (Rear High Towers with Buttresses) ===
+                const buildRearTower = (xSide) => {
+                    const tower = new THREE.Group();
+                    tower.position.set(xSide * 4.4, 2.0, -3.2);
+
+                    // 第一段高塔身
+                    const baseBodyGeo = new THREE.CylinderGeometry(1.2, 1.3, 10, 12);
+                    const baseBody = new THREE.Mesh(baseBodyGeo, wallMaterial);
+                    baseBody.position.y = 5;
+                    tower.add(baseBody);
+
+                    // 中层尖拱露台
+                    const midTerraceGeo = new THREE.CylinderGeometry(1.4, 1.4, 0.5, 12);
+                    const midTerrace = new THREE.Mesh(midTerraceGeo, accentMaterial);
+                    midTerrace.position.y = 10.25;
+                    tower.add(midTerrace);
+
+                    // 第二段纤细核心塔
+                    const upperBodyGeo = new THREE.CylinderGeometry(0.85, 0.85, 4.5, 12);
+                    const upperBody = new THREE.Mesh(upperBodyGeo, wallMaterial);
+                    upperBody.position.y = 12.5;
+                    tower.add(upperBody);
+
+                    // 至高主帽尖
+                    const spireGeo = new THREE.ConeGeometry(0.95, 3.8, 12);
+                    const spire = new THREE.Mesh(spireGeo, roofMaterial);
+                    spire.position.y = 16.55;
+                    tower.add(spire);
+
+                    // 塔顶飘扬金旗
+                    createFlag(0, 18.4, 0, tower);
+
+                    // 飞扶壁支架 (连接后高塔与大殿，构成史诗哥特精妙结构)
+                    const buttressGeo = new THREE.BoxGeometry(1.8, 0.25, 0.5);
+                    const buttress = new THREE.Mesh(buttressGeo, accentMaterial);
+                    buttress.position.set(-xSide * 1.5, 8.5, 1.2);
+                    buttress.rotation.z = xSide * 0.4; // 倾斜跨越
+                    tower.add(buttress);
+
+                    // 错落塔窗
+                    createGothicWindow(0, 7.5, 1.22, 0, tower);
+                    createGothicWindow(0, 13, 0.87, 0, tower);
+                    createGothicWindow(-xSide * 1.22, 4.5, 0, -xSide * Math.PI/2, tower);
+
+                    this.castleGroup.add(tower);
+                };
+                buildRearTower(-1);
+                buildRearTower(1);
+
+                // === E. 中央至尊大圣殿塔 (Grand Central Keep Tower) ===
+                const grandTower = new THREE.Group();
+                grandTower.position.set(0, 7.0, 0); // 自大殿顶部平地拔起
+
+                // 1. 八角形殿堂柱体 (奶油白)
+                const coreBodyGeo = new THREE.CylinderGeometry(1.8, 1.9, 8.5, 8);
+                const coreBody = new THREE.Mesh(coreBodyGeo, wallMaterial);
+                coreBody.position.y = 4.25;
+                grandTower.add(coreBody);
+
+                // 金色高耸雕柱
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i * Math.PI) / 4;
+                    const colGeo = new THREE.CylinderGeometry(0.12, 0.12, 8.5, 8);
+                    const col = new THREE.Mesh(colGeo, goldMaterial);
+                    col.position.set(Math.cos(angle) * 1.85, 4.25, Math.sin(angle) * 1.85);
+                    grandTower.add(col);
+                }
+
+                // 2. 中央大钟楼及皇家雕花金环露台
+                const clockTerraceGeo = new THREE.CylinderGeometry(2.1, 2.1, 0.6, 12);
+                const clockTerrace = new THREE.Mesh(clockTerraceGeo, accentMaterial);
+                clockTerrace.position.y = 8.8;
+                grandTower.add(clockTerrace);
+
+                // 中央极细圣堂尖塔
+                const topSpireBodyGeo = new THREE.CylinderGeometry(1.2, 1.2, 4.5, 8);
+                const topSpireBody = new THREE.Mesh(topSpireBodyGeo, wallMaterial);
+                topSpireBody.position.y = 11.25;
+                grandTower.add(topSpireBody);
+
+                // 至尊主塔尖顶 (粉)
+                const masterRoofGeo = new THREE.ConeGeometry(1.35, 6.2, 12);
+                const masterRoof = new THREE.Mesh(masterRoofGeo, roofMaterial);
+                masterRoof.position.y = 16.5;
+                grandTower.add(masterRoof);
+
+                // 顶层法仗及大号黄金旗帜
+                createFlag(0, 19.6, 0, grandTower);
+
+                // 圣堂大拱门双窗
+                createGothicWindow(-0.6, 4.5, 1.82, 0, grandTower);
+                createGothicWindow(0.6, 4.5, 1.82, 0, grandTower);
+                createGothicWindow(0, 11.5, 1.22, 0, grandTower);
+
+                keepGroup.add(grandTower);
+
+                // === F. 皇家粉红主大门 (Royal Arch Gate) ===
+                const frontGate = new THREE.Group();
+                frontGate.position.set(0, 0, 3.52);
+
+                const gateFrameGeo = new THREE.BoxGeometry(3.2, 3.2, 0.6);
+                const gateFrame = new THREE.Mesh(gateFrameGeo, accentMaterial);
+                gateFrame.position.y = 1.6;
+                frontGate.add(gateFrame);
+
+                // 金色包边拱门
+                const gateArchGeo = new THREE.CylinderGeometry(1.1, 1.1, 0.8, 16, 1, false, 0, Math.PI);
+                const gateArch = new THREE.Mesh(gateArchGeo, goldMaterial);
+                gateArch.rotation.x = Math.PI / 2;
+                gateArch.position.set(0, 2.4, 0);
+                frontGate.add(gateArch);
+
+                // 双扇暗红色大木门
+                const doorGeo = new THREE.BoxGeometry(0.95, 2.3, 0.1);
+                const doorL = new THREE.Mesh(doorGeo, new THREE.MeshStandardMaterial({color: 0x4a1525, roughness: 0.8}));
+                doorL.position.set(-0.48, 1.15, 0.1);
+                const doorR = new THREE.Mesh(doorGeo, new THREE.MeshStandardMaterial({color: 0x4a1525, roughness: 0.8}));
+                doorR.position.set(0.48, 1.15, 0.1);
+                frontGate.add(doorL, doorR);
+
+                keepGroup.add(frontGate);
+
+                this.castleGroup.add(keepGroup);
+
+                // 所有阴影和遮挡开启
+                this.castleGroup.traverse(node => {
+                    if (node.isMesh) {
+                        node.castShadow = true;
+                        node.receiveShadow = true;
+                    }
+                });
+            }
+
+            // --- 3D 魔法六芒星法阵 ---
+            buildMagicCircle() {
+                const circleGroup = new THREE.Group();
+                circleGroup.position.set(0, 0.15, 0);
+
+                // 双重光环线框
+                const ringGeoOuter = new THREE.RingGeometry(8.5, 8.7, 64);
+                const ringGeoInner = new THREE.RingGeometry(7.5, 7.6, 64);
+                const lineMat = new THREE.MeshBasicMaterial({
+                    color: PALETTE.gold,
+                    side: THREE.DoubleSide,
+                    transparent: true,
+                    opacity: 0
+                });
+
+                const ringOuter = new THREE.Mesh(ringGeoOuter, lineMat);
+                ringOuter.rotation.x = Math.PI / 2;
+                const ringInner = new THREE.Mesh(ringGeoInner, lineMat);
+                ringInner.rotation.x = Math.PI / 2;
+
+                circleGroup.add(ringOuter, ringInner);
+
+                // 六芒星骨架线条实现
+                const starPoints = [];
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i * Math.PI) / 3;
+                    starPoints.push(new THREE.Vector3(Math.cos(angle) * 7.5, 0, Math.sin(angle) * 7.5));
+                }
+
+                const lineGeom1 = new THREE.BufferGeometry().setFromPoints([
+                    starPoints[0], starPoints[2], starPoints[4], starPoints[0]
+                ]);
+                const lineGeom2 = new THREE.BufferGeometry().setFromPoints([
+                    starPoints[1], starPoints[3], starPoints[5], starPoints[1]
+                ]);
+
+                const starLine1 = new THREE.Line(lineGeom1, new THREE.LineBasicMaterial({
+                    color: PALETTE.gold,
+                    transparent: true,
+                    opacity: 0
+                }));
+                const starLine2 = new THREE.Line(lineGeom2, new THREE.LineBasicMaterial({
+                    color: PALETTE.gold,
+                    transparent: true,
+                    opacity: 0
+                }));
+
+                circleGroup.add(starLine1, starLine2);
+
+                // 六个顶点的发光小球
+                for (let i = 0; i < 6; i++) {
+                    const sphereGeo = new THREE.SphereGeometry(0.2, 16, 16);
+                    const sphereMat = new THREE.MeshBasicMaterial({
+                        color: PALETTE.white,
+                        transparent: true,
+                        opacity: 0
+                    });
+                    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+                    sphere.position.copy(starPoints[i]);
+                    circleGroup.add(sphere);
+                }
+
+                this.scene.add(circleGroup);
+                this.magicCircle = circleGroup;
+                this.magicCircleMaterial = lineMat;
+                this.magicStarMaterial = starLine1.material;
+            }
+
+            // --- 飘落环境微星颗粒群 ---
+            buildFallingStars() {
+                const count = 150;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(count * 3);
+                
+                for (let i = 0; i < count * 3; i += 3) {
+                    positions[i] = (Math.random() - 0.5) * 60;
+                    positions[i+1] = Math.random() * 40;
+                    positions[i+2] = (Math.random() - 0.5) * 60;
+                }
+
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const material = new THREE.PointsMaterial({
+                    size: 0.15,
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.4
+                });
+
+                this.fallingStars = new THREE.Points(geometry, material);
+                this.scene.add(this.fallingStars);
+            }
+
+            bindEvents() {
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+
+                document.getElementById('start-btn').addEventListener('click', () => {
+                    document.getElementById('intro-screen').classList.add('hide');
+                    this.startEffect();
+                });
+
+                document.getElementById('replay-btn').addEventListener('click', () => {
+                    this.startEffect();
+                });
+            }
+
+            startEffect() {
+                this.timeline = 0;
+                this.lastTime = performance.now();
+                this.isPlaying = true;
+
+                // 物理与状态回归初始
+                this.castleGroup.position.y = -22; // 埋得更深
+                this.castleGroup.traverse(node => {
+                    if (node.isMesh && node.material) {
+                        node.material.transparent = true;
+                        node.material.opacity = 0;
+                    }
+                });
+
+                this.windowLights.forEach(win => {
+                    win.material.color.setHex(0x140a20);
+                });
+
+                // 1. 初始化 350+ 开场汇聚粒子（从外部天球向 (0, 3, 0) 核心区域集结）
+                this.initConvergeParticles();
+
+                // 2. 清理历史烟花粒子系统
+                this.fireworks.forEach(f => this.scene.remove(f.points));
+                this.fireworks = [];
+            }
+
+            // 0s - 1.5s 开场汇聚粒子系统建立
+            initConvergeParticles() {
+                if (this.convergeParticles) this.scene.remove(this.convergeParticles);
+
+                const count = 350;
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(count * 3);
+                this.convergeData = [];
+
+                const targetY = 3.5; // 城堡上升时的核心高点
+                for (let i = 0; i < count; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 25 + Math.random() * 15;
+                    const x = Math.cos(angle) * radius;
+                    const z = Math.sin(angle) * radius;
+                    const y = (Math.random() - 0.5) * 15 + 10;
+
+                    positions[i*3] = x;
+                    positions[i*3+1] = y;
+                    positions[i*3+2] = z;
+
+                    this.convergeData.push({
+                        startX: x, startY: y, startZ: z,
+                        targetX: 0, targetY: targetY, targetZ: 0,
+                        speed: 0.6 + Math.random() * 0.8
+                    });
+                }
+
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const material = new THREE.PointsMaterial({
+                    size: 0.35,
+                    color: PALETTE.gold,
+                    transparent: true,
+                    opacity: 1.0,
+                    blending: THREE.AdditiveBlending
+                });
+
+                this.convergeParticles = new THREE.Points(geometry, material);
+                this.scene.add(this.convergeParticles);
+            }
+
+            // --- 3D 物理烟花绽放系统 (空气动力学膨胀、尾迹自然重力坠落) ---
+            spawnFirework(x, y, z) {
+                const count = 220; // 调高粒子密度
+                const geometry = new THREE.BufferGeometry();
+                const positions = new Float32Array(count * 3);
+                const velocities = [];
+
+                // 随机彩蛋色
+                const color = PALETTE.fireworks[Math.floor(Math.random() * PALETTE.fireworks.length)];
+
+                for (let i = 0; i < count; i++) {
+                    // 球形随机初速度分布
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos((Math.random() * 2) - 1);
+                    const speed = 2.5 + Math.random() * 7.5; // 提高炸开膨胀速度范围
+
+                    const vx = Math.sin(phi) * Math.cos(theta) * speed;
+                    const vy = Math.sin(phi) * Math.sin(theta) * speed;
+                    const vz = Math.cos(phi) * speed;
+
+                    positions[i*3] = x;
+                    positions[i*3+1] = y;
+                    positions[i*3+2] = z;
+
+                    velocities.push(new THREE.Vector3(vx, vy, vz));
+                }
+
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const material = new THREE.PointsMaterial({
+                    size: 0.32,
+                    color: color,
+                    transparent: true,
+                    opacity: 1.0,
+                    blending: THREE.AdditiveBlending
+                });
+
+                const points = new THREE.Points(geometry, material);
+                this.scene.add(points);
+
+                this.fireworks.push({
+                    points: points,
+                    velocities: velocities,
+                    opacity: 1.0,
+                    life: 1.0,
+                    decay: 0.013 + Math.random() * 0.008 // 更自然的拖尾维持周期
+                });
+            }
+
+            // 更新物理烟花系统
+            updateFireworks() {
+                for (let f = this.fireworks.length - 1; f >= 0; f--) {
+                    const fw = this.fireworks[f];
+                    const positions = fw.points.geometry.attributes.position.array;
+                    fw.life -= fw.decay;
+
+                    for (let i = 0; i < fw.velocities.length; i++) {
+                        const vel = fw.velocities[i];
+                        
+                        // 1. 空气阻尼
+                        vel.multiplyScalar(0.955);
+
+                        // 2. 自然落体重力
+                        vel.y -= 0.13; 
+
+                        positions[i*3] += vel.x * 0.05;
+                        positions[i*3+1] += vel.y * 0.05;
+                        positions[i*3+2] += vel.z * 0.05;
+                    }
+
+                    fw.points.geometry.attributes.position.needsUpdate = true;
+                    fw.points.material.opacity = fw.life;
+
+                    // 回收寿命终结的烟花
+                    if (fw.life <= 0) {
+                        this.scene.remove(fw.points);
+                        this.fireworks.splice(f, 1);
+                    }
+                }
+            }
+
+            // 状态机核心时间轴控制
+            update(now) {
+                if (!this.isPlaying) return;
+
+                const dt = (now - this.lastTime) / 1000;
+                this.lastTime = now;
+                this.timeline += dt;
+
+                const t = this.timeline;
+
+                // 强制12秒关停重置
+                if (t >= 12.0) {
+                    this.timeline = 12.0;
+                    this.isPlaying = false;
+                    document.getElementById('hud-title').textContent = "完美谢幕";
+                    document.getElementById('hud-timer').textContent = "12.0s / 12.0s";
+                    return;
+                }
+
+                document.getElementById('hud-timer').textContent = `${t.toFixed(1)}s / 12.0s`;
+
+                // 🕒 0.0s - 1.5s 【开场粒子汇聚】
+                if (t < 1.5) {
+                    document.getElementById('hud-title').textContent = "开场金色粒子汇聚中...";
+                    const progress = t / 1.5;
+                    const positions = this.convergeParticles.geometry.attributes.position.array;
+
+                    for (let i = 0; i < this.convergeData.length; i++) {
+                        const d = this.convergeData[i];
+                        // 三维非对称三阶插值
+                        const curP = this.easeOutCubic(progress);
+                        positions[i*3] = THREE.MathUtils.lerp(d.startX, d.targetX, curP);
+                        positions[i*3+1] = THREE.MathUtils.lerp(d.startY, d.targetY, curP);
+                        positions[i*3+2] = THREE.MathUtils.lerp(d.startZ, d.targetZ, curP);
+                    }
+                    this.convergeParticles.geometry.attributes.position.needsUpdate = true;
+                    this.convergeParticles.material.opacity = 1 - progress;
+
+                    // 1.45s 汇聚合并的炸裂爆发点
+                    if (t >= 1.45) {
+                        this.scene.remove(this.convergeParticles);
+                        this.spawnFirework(0, 5, 0); // 汇聚爆破点稍上移
+                    }
+                }
+
+                // 🕒 1.5s - 3.0s 【金色魔法六芒星法阵展开】
+                if (t >= 1.5 && t < 3.0) {
+                    document.getElementById('hud-title').textContent = "魔法六芒星法阵唤醒...";
+                    const progress = (t - 1.5) / 1.5;
+                    const scale = this.easeOutBack(progress);
+                    
+                    this.magicCircleScale = scale;
+                    this.magicCircle.scale.set(scale, 1, scale);
+                    
+                    this.magicCircleMaterial.opacity = Math.min(1.0, progress * 1.5);
+                    this.magicStarMaterial.opacity = Math.min(1.0, progress * 1.5);
+
+                    // 顶点光球显示
+                    this.magicCircle.children.forEach(child => {
+                        if (child.isMesh) child.material.opacity = Math.min(1.0, progress * 1.5);
+                    });
+                }
+
+                // 魔法阵地表自转
+                if (t >= 1.5 && this.magicCircle) {
+                    this.magicCircle.rotation.y += 0.015;
+                }
+
+                // 🕒 3.0s - 6.0s 【粉白古堡破空升起】
+                if (t >= 3.0 && t < 6.0) {
+                    document.getElementById('hud-title').textContent = "3D粉白城堡，自虚空升起...";
+                    const progress = (t - 3.0) / 2.0; // 2秒主升动画 (3s - 5s)
+                    if (progress >= 0 && progress <= 1.0) {
+                        const ease = this.easeOutBack(progress);
+                        this.castleGroup.position.y = -22 * (1 - ease); // 底座自深渊抬升
+                        
+                        this.castleGroup.traverse(node => {
+                            if (node.isMesh && node.material) {
+                                node.material.opacity = Math.min(1.0, progress * 1.8);
+                            }
+                        });
+                    } else {
+                        this.castleGroup.position.y = 0;
+                        this.castleGroup.traverse(node => {
+                            if (node.isMesh && node.material) node.material.opacity = 1.0;
+                        });
+                    }
+                }
+
+                // 旗帜微风物理动态模拟 (Waving flag)
+                if (this.flags.length > 0) {
+                    this.flags.forEach((flag, index) => {
+                        flag.rotation.x = Math.sin(now * 0.008 + index) * 0.15;
+                        flag.rotation.y = Math.cos(now * 0.005 + index) * 0.1;
+                    });
+                }
+
+                // 🕒 6.0s - 8.0s 【暖色密集窗户渐次点亮】
+                if (t >= 6.0 && t < 8.0) {
+                    document.getElementById('hud-title').textContent = "哥特窗棂，渐次柔和亮灯...";
+                    const progress = (t - 6.0) / 1.2; // 控制亮灯过渡
+                    this.windowLights.forEach((win, index) => {
+                        const delayOffset = (index / this.windowLights.length) * 0.8;
+                        if (progress >= delayOffset) {
+                            win.material.color.lerp(new THREE.Color(PALETTE.yellow), 0.12);
+                        }
+                    });
+                }
+
+                // 🕒 8.0s - 10.5s 【全维 3D 物理烟花盛宴】
+                if (t >= 8.0 && t < 10.5) {
+                    document.getElementById('hud-title').textContent = "尊贵星空，3D物理烟花盛放...";
+                    
+                    // 8.0s 第一波烟花 (城堡左上方)
+                    if (t >= 8.0 && t < 8.05 && !this.leftFireworkTriggered) {
+                        this.leftFireworkTriggered = true;
+                        this.spawnFirework(-10, 15, -4);
+                    }
+
+                    // 8.6s 第二波烟花 (城堡右上方)
+                    if (t >= 8.6 && t < 8.65 && !this.rightFireworkTriggered) {
+                        this.rightFireworkTriggered = true;
+                        this.spawnFirework(10, 15, -4);
+                    }
+
+                    // 9.2s 第三波烟花 (主殿至尊主塔尖顶上方超大主烟花)
+                    if (t >= 9.2 && t < 9.25 && !this.centerFireworkTriggered) {
+                        this.centerFireworkTriggered = true;
+                        this.spawnFirework(0, 24, 0); // 抬高炸裂高度
+                    }
+                }
+
+                // 🕒 10.5s - 12.0s 【谢幕落樱消散】
+                if (t >= 10.5) {
+                    document.getElementById('hud-title').textContent = "华丽落幕，静谧夜雪消逝...";
+                    const fade = (t - 10.5) / 1.5;
+
+                    this.castleGroup.traverse(node => {
+                        if (node.isMesh && node.material) {
+                            node.material.opacity = Math.max(0, 1.0 - fade);
+                        }
+                    });
+
+                    if (this.magicCircleMaterial) {
+                        this.magicCircleMaterial.opacity = Math.max(0, 1.0 - fade * 1.5);
+                        this.magicStarMaterial.opacity = Math.max(0, 1.0 - fade * 1.5);
+                    }
+                }
+
+                // 更新飘落繁星下沉
+                if (this.fallingStars) {
+                    const positions = this.fallingStars.geometry.attributes.position.array;
+                    for (let i = 1; i < positions.length; i += 3) {
+                        positions[i] -= 0.12; // 向下飘荡
+                        if (positions[i] < 0) positions[i] = 40; // 循环边界
+                    }
+                    this.fallingStars.geometry.attributes.position.needsUpdate = true;
+                }
+            }
+
+            // Easing 物理公式
+            easeOutCubic(x) {
+                return 1 - Math.pow(1 - x, 3);
+            }
+
+            easeOutBack(x) {
+                const c1 = 1.70158;
+                const c3 = c1 + 1;
+                return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2);
+            }
+
+            // 三维环景相机自动巡航 (Cinematic camera)
+            autoRotateCamera() {
+                if (!this.isPlaying) {
+                    const speed = 0.0022;
+                    const x = this.camera.position.x;
+                    const z = this.camera.position.z;
+                    this.camera.position.x = x * Math.cos(speed) - z * Math.sin(speed);
+                    this.camera.position.z = x * Math.sin(speed) + z * Math.cos(speed);
+                } else {
+                    // 播放期电影机视角缓动
+                    const t = this.timeline;
+                    if (t > 0 && t < 3.0) {
+                        this.camera.position.lerp(new THREE.Vector3(0, 15, 38), 0.025);
+                    } else if (t >= 3.0 && t < 8.0) {
+                        // 随着城堡升起，镜头向上轻微仰视拉近
+                        this.camera.position.lerp(new THREE.Vector3(4, 9, 32), 0.015);
+                    } else if (t >= 8.0) {
+                        // 烟花盛宴，拉开全视角仰望
+                        this.camera.position.lerp(new THREE.Vector3(-12, 22, 46), 0.02);
+                    }
+                }
+                this.camera.lookAt(0, 6, 0); // 视角锚点稍微拉高到城堡腰部
+            }
+
+            // 三维渲染引擎帧驱动
+            animate() {
+                const now = performance.now();
+                
+                this.update(now);
+                this.updateFireworks();
+                this.autoRotateCamera();
+
+                this.controls.update(); // 手动漫游不冲突
+                this.renderer.render(this.scene, this.camera);
+
+                requestAnimationFrame(() => this.animate());
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            new Gift3DEngine();
+        });
+    </script>
+</body>
+</html>

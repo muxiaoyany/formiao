@@ -62,7 +62,7 @@
         // --- 自定义告白文案 ---
         const COPIES = {
             game1_success: "不管拆到哪个，答案都是我喜欢你 💓",
-            game2_success: "I ❤ U ! 执子之手，与子偕老",
+            game2_success: "I ❤ U ! 始于好感陷于相处",
             game3_success: "我对着星星许了愿：愿望是永远和你在一起 ✨",
             game4_success: "别打了别打了！我投降！我喜欢你还不行吗！😂",
             game5_success: "刮完就是我的人啦~ 😽"
@@ -487,11 +487,11 @@
         let menuButtons = [];
         function initMenu() {
             menuButtons = [
-                new Button(75, 220, 300, 60, "1. 拆盲盒告白", () => changeState('GAME_1'), '🎁'),
+                new Button(75, 220, 300, 60, "1. 喵喵拆盲盒", () => changeState('GAME_1'), '🎁'),
                 new Button(75, 300, 300, 60, "2. 心动连连看", () => changeState('GAME_2'), '🔗'),
                 new Button(75, 380, 300, 60, "3. 星空许愿瓶", () => changeState('GAME_3'), '🌟'),
-                new Button(75, 460, 300, 60, "4. 打地鼠告白", () => changeState('GAME_4'), '🎮'),
-                new Button(75, 540, 300, 60, "5. 刮刮乐告白", () => changeState('GAME_5'), '🎨')
+                new Button(75, 460, 300, 60, "4. 喵喵打地鼠", () => changeState('GAME_4'), '🎮'),
+                new Button(75, 540, 300, 60, "5. 喵喵刮刮乐", () => changeState('GAME_5'), '🎨')
             ];
         }
 

@@ -3,9 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>心动信号 - 心动收集器</title>
+    <title>心动信号 - 喵喵收集器 2.0 豪华版</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -21,792 +23,1321 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background-color: #0d0d1e;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         }
         /* 打字机光标效果 */
         .cursor-blink::after {
             content: '|';
             animation: blink 1s infinite;
+            color: #D63384;
         }
         @keyframes blink {
             0%, 100% { opacity: 0; }
             50% { opacity: 1; }
         }
+        /* 自定义滚动条 */
+        .custom-scroll::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(244, 63, 94, 0.2);
+            border-radius: 99px;
+        }
+        /* 拍立得照片卡片发光 */
+        .polaroid-card {
+            box-shadow: 0 10px 25px -5px rgba(244, 63, 94, 0.15), 0 8px 10px -6px rgba(244, 63, 94, 0.15);
+        }
     </style>
 </head>
-<body class="relative w-screen h-screen overflow-hidden text-slate-100 flex flex-col md:flex-row">
+<body class="relative w-screen h-screen overflow-hidden text-rose-950 flex flex-col md:flex-row transition-colors duration-500">
 
-    <!-- 左侧：交互与设置面板 -->
-    <aside class="w-full md:w-80 border-b md:border-b-0 md:border-r border-rose-950/30 bg-[#0d0d1e]/90 backdrop-blur-md flex flex-col shrink-0 z-10 p-4 justify-between h-[30%] md:h-full">
-        <div class="space-y-4">
-            <!-- 头部标识 -->
-            <div class="flex items-center space-x-3">
-                <div class="bg-gradient-to-tr from-rose-500 to-pink-500 p-2 rounded-xl shadow-lg shadow-rose-500/30 animate-pulse">
-                    <i data-lucide="heart" class="w-5 h-5 text-white fill-white"></i>
+    <div id="app" class="w-full h-full flex flex-col md:flex-row">
+        <!-- 左侧：治愈交互与设置面板 -->
+        <aside class="w-full md:w-85 border-b md:border-b-0 md:border-r border-rose-100 bg-white/95 backdrop-blur-md flex flex-col shrink-0 z-10 p-4 justify-between h-[42%] md:h-full shadow-xl">
+            <div class="space-y-3 overflow-y-auto custom-scroll pr-1 flex-1">
+                <!-- 头部标识 -->
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2.5">
+                        <div class="bg-gradient-to-tr from-pink-400 via-rose-400 to-amber-300 p-2 rounded-2xl shadow-md shadow-rose-300 animate-pulse">
+                            <i data-lucide="cat" class="w-5 h-5 text-white"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-sm font-bold tracking-wider text-rose-700 flex items-center gap-1">
+                                喵喵信号 <span class="text-xs font-normal bg-pink-100 text-pink-600 px-1.5 py-0.5 rounded-full">v2.1 PRO</span>
+                            </h1>
+                            <p class="text-[10px] text-rose-400">Quiet & 喵喵 专属版</p>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <h1 class="text-sm font-bold tracking-wider text-rose-300">心动信号 - Heartbeat</h1>
-                    <p class="text-[10px] text-slate-400">浪漫而治愈的心动收集器</p>
+
+                <!-- 导航 Tab 切换 -->
+                <div class="flex border-b border-rose-100 text-xs">
+                    <button @click="activeTab = 'confess'" :class="['flex-1 py-1.5 text-center border-b-2 font-medium transition-all', activeTab === 'confess' ? 'border-rose-500 text-rose-700' : 'border-transparent text-rose-400']">
+                        💌 表白定制
+                    </button>
+                    <button @click="activeTab = 'diary'" :class="['flex-1 py-1.5 text-center border-b-2 font-medium transition-all', activeTab === 'diary' ? 'border-rose-500 text-rose-700' : 'border-transparent text-rose-400']">
+                        📖 心动手账
+                    </button>
+                    <button @click="activeTab = 'cats'" :class="['flex-1 py-1.5 text-center border-b-2 font-medium transition-all', activeTab === 'cats' ? 'border-rose-500 text-rose-700' : 'border-transparent text-rose-400']">
+                        🐱 萌猫图鉴
+                    </button>
+                    <button @click="activeTab = 'scene'" :class="['flex-1 py-1.5 text-center border-b-2 font-medium transition-all', activeTab === 'scene' ? 'border-rose-500 text-rose-700' : 'border-transparent text-rose-400']">
+                        🌸 梦幻工坊
+                    </button>
+                </div>
+
+                <!-- Tab 1: 表白定制（核心解决静态页保存与分享） -->
+                <div v-show="activeTab === 'confess'" class="space-y-2.5 pt-2 text-xs">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="space-y-1">
+                            <label class="text-[9px] text-rose-400 uppercase tracking-wider font-bold">寄件人 (男生)</label>
+                            <input v-model="sender" @input="saveToLocal" class="w-full bg-rose-50/60 border border-rose-200 text-rose-800 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-pink-400" placeholder="Quiet">
+                        </div>
+                        <div class="space-y-1">
+                            <label class="text-[9px] text-rose-400 uppercase tracking-wider font-bold">收件人 (女生)</label>
+                            <input v-model="receiver" @input="saveToLocal" class="w-full bg-rose-50/60 border border-rose-200 text-rose-800 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-pink-400" placeholder="喵喵">
+                        </div>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-[9px] text-rose-400 uppercase tracking-wider font-bold">喵呜达成 (52只) 告白词</label>
+                        <textarea v-model="msg52" @input="saveToLocal" rows="2" class="w-full bg-rose-50/60 border border-rose-200 text-rose-800 rounded-xl p-2 text-xs focus:outline-none focus:border-pink-400 transition resize-none leading-relaxed" placeholder="输入52只达成文案..."></textarea>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-[9px] text-rose-400 uppercase tracking-wider font-bold">终极心动 (1314只) 告白词</label>
+                        <textarea v-model="msg1314" @input="saveToLocal" rows="2" class="w-full bg-rose-50/60 border border-rose-200 text-rose-800 rounded-xl p-2 text-xs focus:outline-none focus:border-pink-400 transition resize-none leading-relaxed" placeholder="输入1314只达成文案..."></textarea>
+                    </div>
+
+                    <!-- 静态文件分享按钮 -->
+                    <button @click="generateShareLink" class="w-full py-2 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 active:scale-95 text-white font-bold rounded-xl shadow-md shadow-pink-200 transition-all flex items-center justify-center space-x-1.5 mt-2">
+                        <i data-lucide="share-2" class="w-4 h-4"></i>
+                        <span>生成并复制专属告白链接 🔗</span>
+                    </button>
+                    <p class="text-[9px] text-rose-400 text-center">生成链接并发送给TA，TA打开后将看到你填写的浪漫专属设定！</p>
+                </div>
+
+                <!-- Tab 2: 专属回忆拍立得手账 -->
+                <div v-show="activeTab === 'diary'" class="space-y-3 pt-2 text-xs">
+                    <p class="text-[10px] text-rose-400">点击屏幕收集能量，解锁 <b>Quiet 💖 喵喵</b> 的甜蜜生活回忆碎片：</p>
+                    <div class="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scroll">
+                        <div v-for="diary in diaryList" :key="diary.id"
+                             :class="['p-3 rounded-2xl border bg-white polaroid-card transition-all duration-500 flex flex-col space-y-2',
+                                      currentHeartsCount >= diary.milestone ? 'border-pink-200 scale-100 opacity-100' : 'border-dashed border-rose-100 scale-95 opacity-50']">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-bold text-rose-700 flex items-center gap-1">
+                                    <i data-lucide="image" class="w-3.5 h-3.5 text-rose-500"></i>
+                                    {{ diary.title }}
+                                </span>
+                                <span class="text-[9px] bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full font-bold">
+                                    {{ currentHeartsCount >= diary.milestone ? '✨ 已解锁' : `🔒 需 ${diary.milestone} 能量` }}
+                                </span>
+                            </div>
+                            <!-- 拍立得插图模拟 -->
+                            <div class="w-full h-28 bg-rose-50/50 rounded-lg flex items-center justify-center relative overflow-hidden border border-rose-100/50">
+                                <span v-if="currentHeartsCount >= diary.milestone" class="text-4xl animate-bounce">{{ diary.emoji }}</span>
+                                <i v-else data-lucide="lock" class="w-8 h-8 text-rose-200"></i>
+                                <!-- 底部水印 -->
+                                <div class="absolute bottom-1 right-2 text-[9px] text-rose-300 font-mono">
+                                    Quiet & MeowMeow
+                                </div>
+                            </div>
+                            <p class="text-[11px] text-rose-600 leading-relaxed italic text-center">
+                                {{ currentHeartsCount >= diary.milestone ? diary.content : '？？？？？？？？' }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 3: 猫咪图鉴展示 -->
+                <div v-show="activeTab === 'cats'" class="space-y-2 pt-2 text-xs">
+                    <p class="text-[10px] text-rose-400">点击已解锁的萌猫打招呼，还能听见它们独特的喵呜叫声哦！</p>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div v-for="cat in catDictionary" :key="cat.id" 
+                             @click="interactWithUnlockedCat(cat)"
+                             :class="['p-2 rounded-xl border flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300', 
+                                      unlockedCats[cat.id] ? 'bg-white border-pink-200 shadow-sm hover:scale-105' : 'bg-rose-50/40 border-dashed border-rose-200 opacity-60']">
+                            <span class="text-xl mb-1">{{ unlockedCats[cat.id] ? cat.avatar : '🔒' }}</span>
+                            <span class="text-[10px] font-bold" :class="unlockedCats[cat.id] ? 'text-rose-700' : 'text-rose-300'">{{ cat.name }}</span>
+                            <span class="text-[8px] text-rose-400 mt-0.5">{{ unlockedCats[cat.id] ? cat.nature : '待唤醒' }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 4: 梦幻工坊选择 -->
+                <div v-show="activeTab === 'scene'" class="space-y-3 pt-2 text-xs">
+                    <!-- 风格切换 -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-rose-400 uppercase font-bold">换个心境 (环境主题)</label>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <button @click="changeTheme('pink')" :class="['py-1 text-[11px] rounded-lg border transition-all', activeTheme === 'pink' ? 'bg-pink-100 border-pink-400 font-bold text-pink-700' : 'bg-white border-rose-100 text-rose-400']">🌸 樱花粉</button>
+                            <button @click="changeTheme('orange')" :class="['py-1 text-[11px] rounded-lg border transition-all', activeTheme === 'orange' ? 'bg-amber-100 border-amber-400 font-bold text-amber-700' : 'bg-white border-rose-100 text-rose-400']">🍊 蜜桃橘</button>
+                            <button @click="changeTheme('purple')" :class="['py-1 text-[11px] rounded-lg border transition-all', activeTheme === 'purple' ? 'bg-purple-100 border-purple-400 font-bold text-purple-700' : 'bg-white border-rose-100 text-rose-400']">🌌 星空紫</button>
+                        </div>
+                    </div>
+
+                    <!-- 飘落物切换 -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-rose-400 uppercase font-bold">空中魔法 (背景落物)</label>
+                        <div class="grid grid-cols-3 gap-1.5">
+                            <button @click="changeRainItem('sakura')" :class="['py-1 text-[11px] rounded-lg border transition-all', activeRain === 'sakura' ? 'bg-rose-100 border-rose-400 font-bold text-rose-700' : 'bg-white border-rose-100 text-rose-400']">🌸 樱花雨</button>
+                            <button @click="changeRainItem('fish')" :class="['py-1 text-[11px] rounded-lg border transition-all', activeRain === 'fish' ? 'bg-rose-100 border-rose-400 font-bold text-rose-700' : 'bg-white border-rose-100 text-rose-400']">🐟 小鱼干</button>
+                            <button @click="changeRainItem('yarn')" :class="['py-1 text-[11px] rounded-lg border transition-all', activeRain === 'yarn' ? 'bg-rose-100 border-rose-400 font-bold text-rose-700' : 'bg-white border-rose-100 text-rose-400']">🧶 毛线球</button>
+                        </div>
+                    </div>
+
+                    <!-- 八音盒曲目 -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-rose-400 uppercase font-bold">八音盒声调</label>
+                        <select v-model="musicTrack" @change="saveToLocal" class="w-full bg-rose-50/60 border border-rose-200 text-rose-800 rounded-lg p-1.5 text-xs focus:outline-none">
+                            <option value="warm">✨ 温暖回响调</option>
+                            <option value="sweet">🍭 甜甜糖果调</option>
+                            <option value="dream">🌙 月光美梦调</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
-            <!-- 自定义文案配置 -->
-            <div class="hidden md:block space-y-3 pt-4 border-t border-rose-950/20">
-                <h3 class="text-xs font-semibold text-rose-300 flex items-center space-x-1.5">
-                    <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-                    <span>自定义浪漫告白词</span>
-                </h3>
-                
-                <!-- 52颗告白词 -->
-                <div class="space-y-1">
-                    <label class="text-[10px] text-slate-500 uppercase tracking-wider">心动达成 (52颗) 告白词</label>
-                    <textarea id="msg52" rows="2" class="w-full bg-slate-950/60 border border-rose-950/40 text-rose-100 rounded-lg p-2 text-xs focus:outline-none focus:border-rose-500/50 transition resize-none leading-relaxed" placeholder="输入告白文案...">遇见你的那一刻，就是心动的开始 💓</textarea>
+            <!-- 底栏：音效控制与状态 -->
+            <div class="flex items-center justify-between border-t border-rose-100 pt-3 text-[11px] mt-2 shrink-0">
+                <div class="flex items-center space-x-2">
+                    <button id="toggleAudio" @click="toggleAudio" class="flex items-center space-x-1 px-2.5 py-1.5 bg-rose-100 hover:bg-rose-200/60 border border-rose-200 text-rose-600 rounded-xl transition">
+                        <i :data-lucide="audioEnabled ? 'volume-2' : 'volume-x'" class="w-3.5 h-3.5"></i>
+                        <span>{{ audioEnabled ? '喵呜音效：开启' : '音效已关' }}</span>
+                    </button>
                 </div>
-
-                <!-- 1314颗告白词 -->
-                <div class="space-y-1">
-                    <label class="text-[10px] text-slate-500 uppercase tracking-wider">终极心动 (1314颗) 告白词</label>
-                    <textarea id="msg1314" rows="2" class="w-full bg-slate-950/60 border border-rose-950/40 text-rose-100 rounded-lg p-2 text-xs focus:outline-none focus:border-rose-500/50 transition resize-none leading-relaxed" placeholder="输入告白文案...">我喜欢你，不是一时兴起。而是蓄谋已久的温柔 ✨</textarea>
-                </div>
-
-                <!-- 互动说明 -->
-                <div class="bg-rose-950/10 border border-rose-500/10 p-3 rounded-lg space-y-1.5 text-[11px] text-slate-400 leading-relaxed">
-                    <p class="font-medium text-rose-200/80">🎮 互动触发手册：</p>
-                    <p>• 单击屏幕任意位置：产生1颗心跳爱心</p>
-                    <p>• 双击屏幕：迸发3颗爱心+金闪星星</p>
-                    <p>• 长按屏幕：落下浪漫的璀璨爱心雨</p>
-                    <p>• 拖拽滑动：画出一抹美丽的彩色拖尾</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- 底栏：音效控制与状态 -->
-        <div class="flex items-center justify-between border-t border-rose-950/20 pt-3 text-[11px]">
-            <div class="flex items-center space-x-2">
-                <button id="toggleAudio" class="flex items-center space-x-1 px-2.5 py-1.5 bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/20 text-rose-300 rounded-lg transition">
-                    <i data-lucide="volume-2" id="audioIcon" class="w-3.5 h-3.5"></i>
-                    <span id="audioStatus">音效：已开启</span>
+                <button @click="resetProgress" class="text-rose-400 hover:text-rose-600 transition flex items-center space-x-1 py-1">
+                    <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+                    <span>重置游戏</span>
                 </button>
             </div>
-            <button id="resetProgress" class="text-slate-500 hover:text-rose-400 transition flex items-center space-x-1 py-1">
-                <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
-                <span>重置进度</span>
-            </button>
-        </div>
-    </aside>
+        </aside>
 
-    <!-- 右侧：Canvas 浪漫交互区域 -->
-    <main class="flex-1 h-[70%] md:h-full relative overflow-hidden bg-gradient-to-b from-[#0a0a16] to-[#0e0e24]">
-        <!-- 顶部HUD面板：收集进度 -->
-        <div class="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10">
-            <!-- 计数器 -->
-            <div class="bg-slate-900/80 backdrop-blur-md border border-rose-500/20 rounded-full px-4 py-2 flex items-center space-x-3 shadow-lg">
-                <div class="flex items-center space-x-1.5">
-                    <span class="text-rose-400 animate-pulse text-base">💓</span>
-                    <span class="text-xs font-bold text-rose-200 tracking-wider">心动能量:</span>
+        <!-- 右侧：Canvas 浪漫交互区域 -->
+        <main class="flex-1 h-[58%] md:h-full relative overflow-hidden bg-gradient-to-b from-[#FFF0F2] to-[#FFE4E6]">
+            <!-- 顶部HUD面板：收集进度 -->
+            <div class="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none z-10">
+                <!-- 计数器 -->
+                <div class="bg-white/90 backdrop-blur-md border border-rose-200 rounded-full px-4 py-1.5 flex items-center space-x-3 shadow-md">
+                    <div class="flex items-center space-x-1.5">
+                        <span class="text-rose-500 animate-bounce text-sm">💓</span>
+                        <span class="text-xs font-bold text-rose-600 tracking-wider">心动契合度:</span>
+                    </div>
+                    <div class="text-xs font-mono font-black text-rose-800 flex items-baseline space-x-1">
+                        <span class="text-pink-600 text-sm">{{ currentHeartsCount }}</span>
+                        <span class="text-[9px] text-rose-300">/</span>
+                        <span class="text-rose-400">{{ targetHeartsMilestone }}</span>
+                    </div>
                 </div>
-                <div class="text-sm font-mono font-black text-white flex items-baseline space-x-1">
-                    <span id="currentHearts" class="text-rose-300 text-lg">0</span>
-                    <span class="text-[10px] text-slate-500">/</span>
-                    <span id="targetHearts" class="text-slate-400">52</span>
+
+                <!-- 连击 Combo 展示 -->
+                <div v-show="combo.count > 1" 
+                     :style="{ transform: `scale(${combo.scale})` }" 
+                     class="bg-rose-500 text-white rounded-full px-3 py-1 text-xs font-extrabold shadow-md shadow-rose-300 transition-all duration-100 flex items-center space-x-1">
+                    <span>🔥 Meow Combo!</span>
+                    <span class="font-mono text-sm">{{ combo.count }}</span>
+                </div>
+
+                <!-- 状态提示 -->
+                <div id="hintBubble" class="bg-white/95 backdrop-blur-md border border-rose-200 rounded-full px-3 py-1.5 text-[10px] text-pink-600 font-medium shadow-sm animate-bounce hidden sm:block">
+                    {{ hintMessage }}
                 </div>
             </div>
 
-            <!-- 状态提示 -->
-            <div id="hintBubble" class="bg-slate-900/80 backdrop-blur-md border border-rose-500/20 rounded-full px-4 py-2 text-[11px] text-rose-300 font-medium shadow-md animate-bounce">
-                点击屏幕唤醒爱心吧 ✨
+            <!-- 进度条系统 -->
+            <div class="absolute top-16 left-4 right-4 pointer-events-none z-10 max-w-sm">
+                <div class="w-full bg-white/60 rounded-full h-1.5 p-0.5 border border-rose-100 shadow-inner overflow-hidden">
+                    <div class="bg-gradient-to-r from-pink-400 via-rose-400 to-red-400 h-full rounded-full transition-all duration-300" :style="{ width: progressWidth }"></div>
+                </div>
+                <div class="flex justify-between text-[8px] text-rose-400 mt-0.5 pl-1 pr-1 font-mono">
+                    <span>🐱 0只</span>
+                    <span>眨眼睛 (10)</span>
+                    <span>爱心泡泡 (30)</span>
+                    <span>喵呜告白 (52)</span>
+                </div>
             </div>
-        </div>
 
-        <!-- 进度条系统 -->
-        <div class="absolute top-18 left-4 right-4 pointer-events-none z-10 max-w-md">
-            <div class="w-full bg-slate-950/60 rounded-full h-1.5 p-0.5 border border-rose-950/20 shadow-inner overflow-hidden">
-                <div id="progressBar" class="bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+            <!-- 告白展示卡（心动值满52后淡入） -->
+            <div id="confessionCard" class="absolute inset-x-4 top-1/2 -translate-y-1/2 max-w-sm mx-auto bg-white/95 backdrop-blur-lg border-2 border-rose-300 rounded-3xl p-5 shadow-2xl shadow-rose-200 text-center pointer-events-none opacity-0 scale-95 transition-all duration-1000 z-20 flex flex-col items-center justify-center space-y-3.5">
+                <div class="w-12 h-12 rounded-full bg-rose-100 flex items-center justify-center text-rose-500 border border-rose-200 animate-bounce">
+                    <i data-lucide="cat" class="w-6 h-6"></i>
+                </div>
+                <div class="space-y-1.5">
+                    <h2 class="text-[11px] font-bold tracking-widest text-pink-600 uppercase flex items-center justify-center gap-1">
+                        💌 To: {{ receiver || '喵喵' }} 💌
+                    </h2>
+                    <p id="confessionText" class="text-xs text-rose-800 font-medium leading-relaxed italic cursor-blink px-3 text-left md:text-center"></p>
+                    <div class="text-[10px] text-right text-pink-500 pr-4 font-mono font-bold mt-1">
+                        — From: {{ sender || 'Quiet' }}
+                    </div>
+                </div>
+                <div class="text-[9px] text-pink-400 font-mono">
+                    ✨ 做一只有你宠爱的快乐喵 🐾
+                </div>
             </div>
-            <div class="flex justify-between text-[9px] text-slate-500 mt-1 pl-1 pr-1 font-mono">
-                <span>0%</span>
-                <span>心跳契合点 (52)</span>
-                <span>一生一世 (1314)</span>
-            </div>
-        </div>
 
-        <!-- 告白展示卡（心动值达成后淡入） -->
-        <div id="confessionCard" class="absolute inset-x-4 top-1/3 -translate-y-1/2 md:translate-y-0 md:top-32 max-w-lg mx-auto bg-slate-900/85 backdrop-blur-lg border-2 border-rose-500/30 rounded-2xl p-6 shadow-2xl shadow-rose-950/20 text-center pointer-events-none opacity-0 scale-95 transition-all duration-1000 z-20 flex flex-col items-center justify-center space-y-4">
-            <div class="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-400 border border-rose-500/20">
-                <i data-lucide="heart" class="w-6 h-6 fill-rose-500"></i>
-            </div>
-            <div class="space-y-2">
-                <h2 id="confessionTitle" class="text-sm font-semibold tracking-widest text-rose-300 uppercase">💌 心动时刻已达成 💌</h2>
-                <p id="confessionText" class="text-base text-rose-100 font-medium leading-relaxed italic cursor-blink px-4"></p>
-            </div>
-            <div class="text-[10px] text-rose-400/60 font-mono">
-                - 遇见你，风都变得很温柔 -
-            </div>
-        </div>
-
-        <!-- Canvas 画布 -->
-        <canvas id="loveCanvas" class="w-full h-full block cursor-pointer"></canvas>
-    </main>
+            <!-- Canvas 画布 -->
+            <canvas id="loveCanvas" class="w-full h-full block cursor-pointer"
+                    @mousedown="handleCanvasMouseDown"
+                    @mousemove="handleCanvasMouseMove"
+                    @touchstart="handleCanvasTouchStart"
+                    @touchmove="handleCanvasTouchMove"
+                    @touchend="handleCanvasTouchEnd">
+            </canvas>
+        </main>
+    </div>
 
     <script>
-        // 初始化 Lucide 图标库
-        lucide.createIcons();
+        const { createApp, ref, computed, onMounted, nextTick } = Vue;
 
-        // Canvas 初始化
-        const canvas = document.getElementById('loveCanvas');
-        const ctx = canvas.getContext('2d');
+        // 全局物理屏幕缩放比例常量声明（修复：将 scale 移至全局，使其可在全局作用域及 setup 内部无阻碍访问）
+        const scale = window.devicePixelRatio || 1;
 
-        // 音效合成与管理系统 (纯数字合成 Web Audio API - 零音频文件依赖)
-        let audioEnabled = true;
-        let audioCtx = null;
+        createApp({
+            setup() {
+                const activeTab = ref('confess');
+                const activeTheme = ref('pink');
+                const activeRain = ref('sakura');
+                const musicTrack = ref('warm');
 
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-        }
+                // 表白双方，默认：Quiet & 喵喵
+                const sender = ref('Quiet');
+                const receiver = ref('喵喵');
+                const msg52 = ref('喵喵~ 我喜欢你呀，遇见你就是心动的开始 😽🐾');
+                const msg1314 = ref('🐱 喵喵喵 🐱\n遇见你之后，我只想做你的小猫咪。每天蹭蹭你，喵喵叫，永远赖在你身边 💗');
 
-        // 播放合成音效
-        function playSound(type) {
-            if (!audioEnabled) return;
-            try {
-                initAudio();
-                if (audioCtx.state === 'suspended') {
-                    audioCtx.resume();
-                }
+                // 收集进度
+                const currentHeartsCount = ref(0);
+                const targetHeartsMilestone = ref(52);
+                const hintMessage = ref('点击屏幕，召唤 Quiet 🐱 与 喵喵 🐱 贴贴吧！');
 
-                if (type === 'tap') {
-                    // "噗" 的温柔心跳声
-                    const osc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
-                    osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.15);
-                    
-                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-                    
-                    osc.connect(gain);
-                    gain.connect(audioCtx.destination);
-                    osc.start();
-                    osc.stop(audioCtx.currentTime + 0.15);
-                } else if (type === 'success') {
-                    // "叮" 的清脆风铃达成音
-                    const now = audioCtx.currentTime;
-                    const osc1 = audioCtx.createOscillator();
-                    const osc2 = audioCtx.createOscillator();
-                    const gain1 = audioCtx.createGain();
-                    const gain2 = audioCtx.createGain();
+                // 连击 Combo
+                const combo = ref({ count: 0, scale: 1.0, lastTap: 0 });
 
-                    osc1.type = 'sine';
-                    osc1.frequency.setValueAtTime(523.25, now); // C5
-                    osc1.frequency.exponentialRampToValueAtTime(1046.50, now + 0.4); // C6
-                    gain1.gain.setValueAtTime(0.2, now);
-                    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                // 阶段状态
+                const catsBlinking = ref(false);
+                const showHeartBubbles = ref(false);
+                const finaleDancing = ref(false);
 
-                    osc2.type = 'triangle';
-                    osc2.frequency.setValueAtTime(659.25, now); // E5
-                    gain2.gain.setValueAtTime(0.15, now);
-                    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+                // 打字机时钟管理
+                let typeTimer = null;
 
-                    osc1.connect(gain1);
-                    gain1.connect(audioCtx.destination);
-                    osc2.connect(gain2);
-                    gain2.connect(audioCtx.destination);
+                // 拍立得手账内容
+                const diaryList = [
+                    { id: 1, milestone: 10, title: "第一次相遇 🐾", emoji: "🐈🎵", content: "Quiet 看到了正在角落打滚的 喵喵，心就被彻底萌化了。" },
+                    { id: 2, milestone: 20, title: "咕噜噜的贴贴 🍭", emoji: "🎧🎀", content: "安静的 Quiet 猫趴在 喵喵 旁边，分享着同一个耳机，听起了欢快的八音盒乐章。" },
+                    { id: 3, milestone: 30, title: "捕捉美味小鱼干 🐟", emoji: "🎣🐱", content: "Quiet 总是把最香的小鱼干留给 喵喵，看她吃饱后在沙发上懒洋洋地打呼噜。" },
+                    { id: 4, milestone: 42, title: "彩色毛线球大作战 🧶", emoji: "🧶🌟", content: "喵喵 玩毛线球绊倒了自己，Quiet 跑过来一边帮她解开，一边轻轻蹭了蹭她的耳朵。" },
+                    { id: 5, milestone: 52, title: "浪漫的心动誓言 💍", emoji: "👑💖", content: "“我喜欢你，不是一时兴起。我的耳朵，一辈子都只想倾听你的喵喵叫。”" }
+                ];
 
-                    osc1.start();
-                    osc1.stop(now + 0.5);
-                    osc2.start();
-                    osc2.stop(now + 0.5);
-                } else if (type === 'music') {
-                    // 浪漫纯八音盒达成小旋律 (简短浪漫的5音小调)
-                    const melody = [523.25, 587.33, 659.25, 783.99, 880.00]; // C D E G A
-                    const duration = 0.25;
-                    const now = audioCtx.currentTime;
-                    
-                    melody.forEach((freq, idx) => {
-                        const osc = audioCtx.createOscillator();
-                        const gain = audioCtx.createGain();
-                        osc.type = 'sine';
-                        osc.frequency.setValueAtTime(freq, now + idx * duration);
-                        
-                        gain.gain.setValueAtTime(0.15, now + idx * duration);
-                        gain.gain.exponentialRampToValueAtTime(0.01, now + idx * duration + 0.4);
-                        
-                        osc.connect(gain);
-                        gain.connect(audioCtx.destination);
-                        osc.start(now + idx * duration);
-                        osc.stop(now + idx * duration + 0.5);
-                    });
-                }
-            } catch (e) {
-                console.warn('Web Audio API 初始化或播放受阻:', e);
-            }
-        }
+                // 萌猫图鉴 (默认解锁 橘猫-Quiet专属，白猫-喵喵专属)
+                const catDictionary = [
+                    { id: 'orange', name: 'Quiet猫', avatar: '🎧', nature: '安静听音乐', color: '#B8C5D6', voice: 720 },
+                    { id: 'white', name: '喵喵猫', avatar: '🎀', nature: '爱贴贴大眼', color: '#FFFFFF', voice: 1046 },
+                    { id: 'calico', name: '花花', avatar: '😸', nature: '傲娇小淘气', color: '#FFD1DC', voice: 980 },
+                    { id: 'yellow', name: '奶糖', avatar: '😽', nature: '黏人高甜', color: '#FFE5B4', voice: 880 },
+                    { id: 'black', name: '小黑', avatar: '🐈', nature: '神秘大侠', color: '#4A4A4A', voice: 620 },
+                    { id: 'pink', name: '樱樱', avatar: '🦁', nature: '粉色美少女', color: '#FFCAD4', voice: 1120 }
+                ];
 
-        // 音频状态控制按钮绑定
-        const toggleAudioBtn = document.getElementById('toggleAudio');
-        const audioIcon = document.getElementById('audioIcon');
-        const audioStatus = document.getElementById('audioStatus');
+                const unlockedCats = ref({
+                    orange: true,
+                    white: true,
+                    calico: false,
+                    yellow: false,
+                    black: false,
+                    pink: false
+                });
 
-        toggleAudioBtn.addEventListener('click', () => {
-            audioEnabled = !audioEnabled;
-            if (audioEnabled) {
-                audioStatus.textContent = "音效：已开启";
-                toggleAudioBtn.className = "flex items-center space-x-1 px-2.5 py-1.5 bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/20 text-rose-300 rounded-lg transition";
-                audioIcon.setAttribute('data-lucide', 'volume-2');
-                playSound('tap');
-            } else {
-                audioStatus.textContent = "音效：已关闭";
-                toggleAudioBtn.className = "flex items-center space-x-1 px-2.5 py-1.5 bg-slate-950/30 hover:bg-slate-900/20 border border-slate-800 text-slate-500 rounded-lg transition";
-                audioIcon.setAttribute('data-lucide', 'volume-x');
-            }
-            lucide.createIcons();
-        });
+                // Canvas 对象和动画核心
+                let canvas, ctx;
+                let isLongPressing = false;
+                let longPressTimer = null;
+                let confettiTriggered52 = false;
+                let confettiTriggered1314 = false;
 
-        // 告白文案状态
-        const msg52Input = document.getElementById('msg52');
-        const msg1314Input = document.getElementById('msg1314');
+                const floatingCats = [];
+                const particles = [];
+                const trailPaws = [];
+                const bgSakura = [];
+                const bgItems = [];
 
-        // 自适应屏幕分辨率
-        let scale = window.devicePixelRatio || 1;
-        function resizeCanvas() {
-            canvas.width = canvas.clientWidth * scale;
-            canvas.height = canvas.clientHeight * scale;
-            ctx.scale(scale, scale);
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+                // Audio Context
+                const audioEnabled = ref(true);
+                let audioCtx = null;
 
-        // 核心运行状态
-        let currentHeartsCount = 0;
-        let isLongPressing = false;
-        let longPressTimer = null;
-        let targetHeartsMilestone = 52;
-        let confettiTriggered52 = false;
-        let confettiTriggered1314 = false;
+                const initAudio = () => {
+                    if (!audioCtx) {
+                        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                };
 
-        // 对象池与粒子容器
-        const floatingHearts = []; // 存储上升的爱心对象
-        const particles = [];      // 存储爆发特效粒子
-        const trailParticles = []; // 鼠标滑动拖尾粒子
-        const backgroundStars = []; // 缓慢流动的背景星星
+                const playSound = (type, pitchFreq = null) => {
+                    if (!audioEnabled.value) return;
+                    try {
+                        initAudio();
+                        if (audioCtx.state === 'suspended') audioCtx.resume();
+                        const now = audioCtx.currentTime;
 
-        // 创建背景星星
-        for (let i = 0; i < 60; i++) {
-            backgroundStars.push({
-                x: Math.random() * window.innerWidth,
-                y: Math.random() * window.innerHeight,
-                size: Math.random() * 1.5 + 0.5,
-                alpha: Math.random() * 0.8 + 0.2,
-                speed: Math.random() * 0.05 + 0.02
-            });
-        }
-
-        // ==================== 粒子类与工具函数定义 ====================
-
-        // 绘制 Canvas 矢量标准心形
-        function drawHeart(ctx, x, y, size) {
-            ctx.beginPath();
-            ctx.moveTo(x, y - size / 4);
-            // 三阶贝塞尔曲线精确控制优美的心形轮廓
-            ctx.bezierCurveTo(x + size / 2, y - size, x + size, y - size / 3, x, y + size * 0.9);
-            ctx.bezierCurveTo(x - size, y - size / 3, x - size / 2, y - size, x, y - size / 4);
-            ctx.closePath();
-        }
-
-        // 浮动心形类
-        class FloatingHeart {
-            constructor(x, y, isDouble = false) {
-                this.x = x;
-                this.y = y;
-                this.size = isDouble ? Math.random() * 12 + 18 : Math.random() * 10 + 12;
-                this.vx = (Math.random() - 0.5) * 2;
-                this.vy = -(Math.random() * 1.5 + 1.5);
-                this.alpha = 1;
-                this.fadeSpeed = Math.random() * 0.008 + 0.006;
-                // 温馨治愈调色盘：柔粉色 -> 玫瑰红 -> 晶莹紫 -> 橙红
-                const colors = ['#FF6B9D', '#FF4777', '#FF85B3', '#E879F9', '#FF8A65'];
-                this.color = colors[Math.floor(Math.random() * colors.length)];
-                this.scale = 0.1; // 从小变大的弹性动画
-                this.targetScale = 1.0;
-                this.swingSpeed = Math.random() * 0.03 + 0.01;
-                this.swingRange = Math.random() * 1.5 + 0.5;
-                this.swingOffset = Math.random() * Math.PI * 2;
-            }
-
-            update() {
-                this.x += this.vx + Math.sin(this.swingOffset) * this.swingRange;
-                this.y += this.vy;
-                this.swingOffset += this.swingSpeed;
-
-                if (this.scale < this.targetScale) {
-                    this.scale += 0.08;
-                }
-
-                this.alpha -= this.fadeSpeed;
-            }
-
-            draw(ctx) {
-                ctx.save();
-                ctx.globalAlpha = this.alpha;
-                ctx.fillStyle = this.color;
-                // 添加微微的爱心发光阴影
-                ctx.shadowBlur = 12;
-                ctx.shadowColor = this.color;
-
-                ctx.translate(this.x, this.y);
-                ctx.scale(this.scale, this.scale);
-                drawHeart(ctx, 0, 0, this.size);
-                ctx.fill();
-                ctx.restore();
-            }
-        }
-
-        // 星星/烟花爆发粒子类
-        class Particle {
-            constructor(x, y, color) {
-                this.x = x;
-                this.y = y;
-                const angle = Math.random() * Math.PI * 2;
-                const speed = Math.random() * 4 + 2;
-                this.vx = Math.cos(angle) * speed;
-                this.vy = Math.sin(angle) * speed;
-                this.size = Math.random() * 3 + 1.5;
-                this.alpha = 1;
-                this.fadeSpeed = Math.random() * 0.02 + 0.015;
-                this.color = color || '#FFE082'; // 默认香槟金
-                this.gravity = 0.05;
-            }
-
-            update() {
-                this.x += this.vx;
-                this.vy += this.gravity;
-                this.y += this.vy;
-                this.alpha -= this.fadeSpeed;
-            }
-
-            draw(ctx) {
-                ctx.save();
-                ctx.globalAlpha = this.alpha;
-                ctx.fillStyle = this.color;
-                ctx.shadowBlur = 8;
-                ctx.shadowColor = this.color;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-            }
-        }
-
-        // 滑动拖尾粒子类
-        class TrailParticle {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.size = Math.random() * 4 + 4;
-                this.alpha = 0.8;
-                const colors = ['#FFD54F', '#F48FB1', '#81D4FA', '#A5D6A7', '#B39DDB'];
-                this.color = colors[Math.floor(Math.random() * colors.length)];
-            }
-
-            update() {
-                this.alpha -= 0.03;
-                this.size *= 0.95;
-            }
-
-            draw(ctx) {
-                ctx.save();
-                ctx.globalAlpha = this.alpha;
-                ctx.fillStyle = this.color;
-                ctx.shadowBlur = 6;
-                ctx.shadowColor = this.color;
-                drawHeart(ctx, this.x, this.y, this.size);
-                ctx.fill();
-                ctx.restore();
-            }
-        }
-
-        // 中心浪漫巨型心跳实体
-        const centerHeart = {
-            baseSize: 72,
-            size: 72,
-            scalePhase: 0,
-            pulseSpeed: 0.03,
-            clickAccelerate: 0,
-            x: 0,
-            y: 0,
-
-            update() {
-                // 心跳节奏控制算法：结合正弦波，实现双重收缩模拟真实心率
-                this.scalePhase += this.pulseSpeed + this.clickAccelerate;
-                if (this.clickAccelerate > 0) {
-                    this.clickAccelerate *= 0.95; // 渐进恢复常态
-                }
-
-                const wave = Math.sin(this.scalePhase) * 0.12;
-                // 第二重收缩微调，让跳动更动感
-                const doubleBeat = Math.sin(this.scalePhase * 2) * 0.04;
-                this.size = this.baseSize * (1 + wave + Math.max(0, doubleBeat));
-            },
-
-            draw(ctx, width, height) {
-                this.x = width / 2;
-                this.y = height / 2 + 15;
-
-                ctx.save();
-                // 绘制底层呼吸光晕
-                ctx.globalAlpha = 0.15 + Math.sin(this.scalePhase) * 0.05;
-                ctx.fillStyle = '#FF4777';
-                ctx.shadowBlur = 30 + Math.sin(this.scalePhase) * 15;
-                ctx.shadowColor = '#FF4777';
-                ctx.beginPath();
-                drawHeart(ctx, this.x, this.y, this.size * 1.3);
-                ctx.fill();
-
-                // 绘制核心发光爱心
-                ctx.globalAlpha = 1.0;
-                // 精致的径向渐变，营造晶莹饱满、立体温润的质感
-                const gradient = ctx.createRadialGradient(
-                    this.x - this.size * 0.2, this.y - this.size * 0.2, this.size * 0.1,
-                    this.x, this.y, this.size
-                );
-                gradient.addColorStop(0, '#FFA4C2'); // 高光淡粉
-                gradient.addColorStop(0.3, '#FF5C8A'); // 浪漫玫瑰红
-                gradient.addColorStop(1, '#CC1144'); // 边缘深红
-                
-                ctx.fillStyle = gradient;
-                ctx.shadowBlur = 20;
-                ctx.shadowColor = '#FF4777';
-                ctx.beginPath();
-                drawHeart(ctx, this.x, this.y, this.size);
-                ctx.fill();
-                ctx.restore();
-            }
-        };
-
-        // ==================== 业务交互与计数触发逻辑 ====================
-
-        // 更新计数UI面板
-        const currentHeartsText = document.getElementById('currentHearts');
-        const targetHeartsText = document.getElementById('targetHearts');
-        const progressBar = document.getElementById('progressBar');
-        const hintBubble = document.getElementById('hintBubble');
-
-        function addHeartCount(count = 1) {
-            currentHeartsCount += count;
-            currentHeartsText.textContent = currentHeartsCount;
-
-            // 契合度进度计算
-            let progress = 0;
-            if (currentHeartsCount < 52) {
-                progress = (currentHeartsCount / 52) * 50; // 前半段占50%
-                targetHeartsText.textContent = "52";
-                targetHeartsMilestone = 52;
-                hintBubble.textContent = "心动能量汇聚中 ✨";
-            } else if (currentHeartsCount < 1314) {
-                // 后半段映射到 50% - 100%
-                const subProgress = ((currentHeartsCount - 52) / (1314 - 52)) * 50;
-                progress = 50 + subProgress;
-                targetHeartsText.textContent = "1314";
-                targetHeartsMilestone = 1314;
-                hintBubble.textContent = "达成第一阶段！向1314进发 ✨";
-            } else {
-                progress = 100;
-                targetHeartsText.textContent = "1314";
-                targetHeartsMilestone = 1314;
-                hintBubble.textContent = "已达成终极心动奇迹 💖";
-            }
-
-            progressBar.style.width = `${Math.min(100, progress)}%`;
-
-            // 检查里程碑达成触发
-            checkMilestones();
-        }
-
-        // 打字机告白文案展现器
-        let typeTimer = null;
-        function typeWriter(text, element, speed = 80) {
-            element.innerHTML = "";
-            let i = 0;
-            clearInterval(typeTimer);
-            element.classList.add('cursor-blink');
-            
-            typeTimer = setInterval(() => {
-                if (i < text.length) {
-                    element.innerHTML += text.charAt(i);
-                    i++;
-                } else {
-                    clearInterval(typeTimer);
-                    setTimeout(() => {
-                        element.classList.remove('cursor-blink');
-                    }, 1000);
-                }
-            }, speed);
-        }
-
-        // 里程碑事件检测器
-        const confessionCard = document.getElementById('confessionCard');
-        const confessionTitle = document.getElementById('confessionTitle');
-        const confessionText = document.getElementById('confessionText');
-
-        function checkMilestones() {
-            // 1. 52 颗心心解锁告白
-            if (currentHeartsCount >= 52 && !confettiTriggered52) {
-                confettiTriggered52 = true;
-                playSound('success');
-                playSound('music');
-                
-                // 产生大范围烟花爆烈粒子
-                for (let i = 0; i < 80; i++) {
-                    particles.push(new Particle(canvas.clientWidth / 2, canvas.clientHeight / 2 - 50, '#FF4777'));
-                    particles.push(new Particle(canvas.clientWidth / 2, canvas.clientHeight / 2 - 50, '#FFD54F'));
-                    particles.push(new Particle(canvas.clientWidth / 2, canvas.clientHeight / 2 - 50, '#81D4FA'));
-                }
-
-                // 展示告白卡
-                confessionCard.style.opacity = '1';
-                confessionCard.style.transform = 'translateY(0) scale(1)';
-                confessionTitle.textContent = "💌 心动契合达成 💌";
-                const customMsg52 = msg52Input.value.trim() || "遇见你的那一刻，就是心动的开始 💓";
-                typeWriter(customMsg52, confessionText, 100);
-            }
-
-            // 2. 1314 颗心心终极彩蛋
-            if (currentHeartsCount >= 1314 && !confettiTriggered1314) {
-                confettiTriggered1314 = true;
-                playSound('success');
-                // 循环播放浪漫旋律
-                playSound('music');
-                setTimeout(() => playSound('music'), 1500);
-
-                // 全屏大漫射烟花
-                for (let k = 0; k < 5; k++) {
-                    setTimeout(() => {
-                        const randomX = Math.random() * canvas.clientWidth;
-                        const randomY = Math.random() * (canvas.clientHeight * 0.6);
-                        const colors = ['#E879F9', '#FFD54F', '#81D4FA', '#FF4777', '#A5D6A7'];
-                        const selectedColor = colors[Math.floor(Math.random() * colors.length)];
-                        for (let i = 0; i < 60; i++) {
-                            particles.push(new Particle(randomX, randomY, selectedColor));
+                        if (type === 'tap') {
+                            const osc = audioCtx.createOscillator();
+                            const gain = audioCtx.createGain();
+                            osc.type = 'triangle';
+                            const startFreq = pitchFreq || (850 + Math.random() * 120);
+                            osc.frequency.setValueAtTime(startFreq, now);
+                            osc.frequency.exponentialRampToValueAtTime(startFreq * 1.3, now + 0.12);
+                            gain.gain.setValueAtTime(0.12, now);
+                            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                            osc.connect(gain);
+                            gain.connect(audioCtx.destination);
+                            osc.start();
+                            osc.stop(now + 0.15);
+                        } else if (type === 'success') {
+                            const osc1 = audioCtx.createOscillator();
+                            const osc2 = audioCtx.createOscillator();
+                            const gain = audioCtx.createGain();
+                            osc1.type = 'sine'; osc2.type = 'sine';
+                            osc1.frequency.setValueAtTime(880, now);
+                            osc1.frequency.exponentialRampToValueAtTime(1320, now + 0.3);
+                            osc2.frequency.setValueAtTime(1046.5, now);
+                            osc2.frequency.exponentialRampToValueAtTime(1567.9, now + 0.3);
+                            gain.gain.setValueAtTime(0.15, now);
+                            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                            osc1.connect(gain); osc2.connect(gain);
+                            gain.connect(audioCtx.destination);
+                            osc1.start(); osc2.start();
+                            osc1.stop(now + 0.4); osc2.stop(now + 0.4);
+                        } else if (type === 'music') {
+                            let melody = [523.25, 659.25, 783.99, 880.00, 1046.50];
+                            if (musicTrack.value === 'sweet') melody = [587.33, 739.99, 880.00, 987.77, 1174.66];
+                            else if (musicTrack.value === 'dream') melody = [440.00, 554.37, 659.25, 880.00, 987.77];
+                            const duration = 0.22;
+                            melody.forEach((freq, idx) => {
+                                const osc = audioCtx.createOscillator();
+                                const gain = audioCtx.createGain();
+                                osc.type = 'sine';
+                                osc.frequency.setValueAtTime(freq, now + idx * duration);
+                                gain.gain.setValueAtTime(0.07, now + idx * duration);
+                                gain.gain.exponentialRampToValueAtTime(0.001, now + idx * duration + 0.5);
+                                osc.connect(gain);
+                                gain.connect(audioCtx.destination);
+                                osc.start(now + idx * duration);
+                                osc.stop(now + idx * duration + 0.6);
+                            });
                         }
-                    }, k * 400);
+                    } catch (e) {
+                        console.warn('Web Audio API 受到阻碍:', e);
+                    }
+                };
+
+                const toggleAudio = () => {
+                    audioEnabled.value = !audioEnabled.value;
+                    if (audioEnabled.value) playSound('tap');
+                };
+
+                const changeTheme = (theme) => {
+                    activeTheme.value = theme;
+                    playSound('tap');
+                    const bodyEl = document.body;
+                    if (theme === 'pink') bodyEl.style.backgroundColor = '#FFE4E6';
+                    else if (theme === 'orange') bodyEl.style.backgroundColor = '#FEF3C7';
+                    else if (theme === 'purple') bodyEl.style.backgroundColor = '#F3E8FF';
+                    saveToLocal();
+                };
+
+                const changeRainItem = (rainType) => {
+                    activeRain.value = rainType;
+                    playSound('tap');
+                    initBgItems();
+                    saveToLocal();
+                };
+
+                const initBgItems = () => {
+                    bgItems.length = 0;
+                    for (let i = 0; i < 10; i++) {
+                        bgItems.push({
+                            x: Math.random() * window.innerWidth,
+                            y: Math.random() * window.innerHeight,
+                            type: activeRain.value,
+                            size: Math.random() * 12 + 10,
+                            opacity: Math.random() * 0.12 + 0.05,
+                            rotation: Math.random() * Math.PI,
+                            rotSpeed: (Math.random() - 0.5) * 0.004,
+                            speed: Math.random() * 0.4 + 0.2
+                        });
+                    }
+                };
+
+                // LocalStorage 数据持久化
+                const saveToLocal = () => {
+                    const localData = {
+                        sender: sender.value,
+                        receiver: receiver.value,
+                        msg52: msg52.value,
+                        msg1314: msg1314.value,
+                        activeTheme: activeTheme.value,
+                        activeRain: activeRain.value,
+                        musicTrack: musicTrack.value,
+                        heartsCount: currentHeartsCount.value
+                    };
+                    localStorage.setItem('meow_signal_data_2', JSON.stringify(localData));
+                };
+
+                // 动态生成并复制专属告白 URL
+                const generateShareLink = () => {
+                    const config = {
+                        s: sender.value,
+                        r: receiver.value,
+                        m1: msg52.value,
+                        m2: msg1314.value,
+                        t: activeTheme.value,
+                        i: activeRain.value,
+                        mu: musicTrack.value
+                    };
+                    // 转为 Base64 字符串
+                    const base64Str = btoa(encodeURIComponent(JSON.stringify(config)));
+                    const shareUrl = `${window.location.origin}${window.location.pathname}?state=${base64Str}`;
+                    
+                    // 复制到剪贴板
+                    const tempInput = document.createElement('input');
+                    tempInput.value = shareUrl;
+                    document.body.appendChild(tempInput);
+                    tempInput.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(tempInput);
+
+                    hintMessage.value = "💌 专属浪漫链接已复制到剪贴板！快发给TA打开吧！";
+                    playSound('success');
+                };
+
+                // 读取 URL 传入的分享状态
+                const parseUrlState = () => {
+                    try {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const state = urlParams.get('state');
+                        if (state) {
+                            const decodedData = JSON.parse(decodeURIComponent(atob(state)));
+                            sender.value = decodedData.s || 'Quiet';
+                            receiver.value = decodedData.r || '喵喵';
+                            msg52.value = decodedData.m1 || '';
+                            msg1314.value = decodedData.m2 || '';
+                            activeTheme.value = decodedData.t || 'pink';
+                            activeRain.value = decodedData.i || 'sakura';
+                            musicTrack.value = decodedData.mu || 'warm';
+                            
+                            changeTheme(activeTheme.value);
+                            initBgItems();
+                            hintMessage.value = `💕 成功载入来自 ${sender.value} 为你特别定制的浪漫表白！`;
+                        } else {
+                            // 读取 localStorage
+                            const local = localStorage.getItem('meow_signal_data_2');
+                            if (local) {
+                                const localData = JSON.parse(local);
+                                sender.value = localData.sender || 'Quiet';
+                                receiver.value = localData.receiver || '喵喵';
+                                msg52.value = localData.msg52 || '';
+                                msg1314.value = localData.msg1314 || '';
+                                activeTheme.value = localData.activeTheme || 'pink';
+                                activeRain.value = localData.activeRain || 'sakura';
+                                musicTrack.value = localData.musicTrack || 'warm';
+                                currentHeartsCount.value = localData.heartsCount || 0;
+                                
+                                changeTheme(activeTheme.value);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('URL 参数解析失败，加载默认配置:', e);
+                    }
+                };
+
+                // 解锁猫咪与打招呼
+                const interactWithUnlockedCat = (cat) => {
+                    if (unlockedCats.value[cat.id]) {
+                        playSound('tap', cat.voice);
+                        const cx = canvas.clientWidth / 2;
+                        const cy = canvas.clientHeight / 2;
+                        floatingCats.push(new FloatingCat(cx + (Math.random()-0.5)*40, cy, true, cat.color, cat.id));
+                        hintMessage.value = `你摸了摸 [${cat.name}]，它舒服地喵喵叫 🐾`;
+                    } else {
+                        playSound('tap', 300);
+                        hintMessage.value = `这只猫咪还在美梦中，继续召唤能量唤醒它吧!`;
+                    }
+                };
+
+                const progressWidth = computed(() => {
+                    let progress = 0;
+                    if (currentHeartsCount.value < 52) {
+                        progress = (currentHeartsCount.value / 52) * 50; 
+                    } else if (currentHeartsCount.value < 1314) {
+                        const subProgress = ((currentHeartsCount.value - 52) / (1314 - 52)) * 50;
+                        progress = 50 + subProgress;
+                    } else {
+                        progress = 100;
+                    }
+                    return `${Math.min(100, progress)}%`;
+                });
+
+                // 监控手账与猫咪解锁
+                const checkCatUnlocks = () => {
+                    const count = currentHeartsCount.value;
+                    if (count >= 10 && !unlockedCats.value.calico) {
+                        unlockedCats.value.calico = true;
+                        hintMessage.value = "🐾 花花猫已被唤醒！快去图鉴看看它~";
+                        playSound('success');
+                    }
+                    if (count >= 20 && !unlockedCats.value.yellow) {
+                        unlockedCats.value.yellow = true;
+                        hintMessage.value = "🐾 黏人王“奶糖”加入图鉴！";
+                        playSound('success');
+                    }
+                    if (count >= 30 && !unlockedCats.value.black) {
+                        unlockedCats.value.black = true;
+                        hintMessage.value = "🐾 神秘的“小黑”已唤醒，解锁爱心泡泡氛围！";
+                        playSound('success');
+                        showHeartBubbles.value = true;
+                    }
+                    if (count >= 42 && !unlockedCats.value.pink) {
+                        unlockedCats.value.pink = true;
+                        hintMessage.value = "🐾 “小樱樱”被唤醒啦，即将迎来心动誓言！";
+                        playSound('success');
+                    }
+                    catsBlinking.value = count >= 10;
+                };
+
+                const updateCombo = () => {
+                    const now = Date.now();
+                    if (now - combo.value.lastTap < 450) {
+                        combo.value.count++;
+                        combo.value.scale = 1.25;
+                        setTimeout(() => combo.value.scale = 1.0, 100);
+
+                        if (combo.value.count % 10 === 0) {
+                            const comboTexts = [
+                                `Quiet猫 💖 喵喵猫 贴贴成功！🐾`,
+                                `太默契啦！Meow Combo x${combo.value.count}! ✨`,
+                                `贴贴能量大爆发！🌸`,
+                                `今天也要黏在你身边喵~ 💓`
+                            ];
+                            hintMessage.value = comboTexts[Math.floor(Math.random() * comboTexts.length)];
+                        }
+                    } else {
+                        combo.value.count = 1;
+                    }
+                    combo.value.lastTap = now;
+                };
+
+                // 重置游戏进度函数
+                const resetProgress = () => {
+                    currentHeartsCount.value = 0;
+                    confettiTriggered52 = false;
+                    confettiTriggered1314 = false;
+                    catsBlinking.value = false;
+                    showHeartBubbles.value = false;
+                    finaleDancing.value = false;
+                    targetHeartsMilestone.value = 52;
+                    hintMessage.value = '点击屏幕，召唤 Quiet 🐱 与 喵喵 🐱 贴贴吧！';
+
+                    // 重新锁定进阶猫咪，保留两个默认解锁主角
+                    unlockedCats.value = {
+                        orange: true,
+                        white: true,
+                        calico: false,
+                        yellow: false,
+                        black: false,
+                        pink: false
+                    };
+
+                    const card = document.getElementById('confessionCard');
+                    if (card) {
+                        card.style.opacity = '0';
+                        card.style.transform = 'translate(-50%, -45%) scale(0.9)';
+                    }
+                    
+                    clearInterval(typeTimer);
+                    const confessionTextElem = document.getElementById('confessionText');
+                    if (confessionTextElem) {
+                        confessionTextElem.innerHTML = "";
+                    }
+
+                    playSound('tap');
+                    saveToLocal();
+                };
+
+                // ==================== 高级图形渲染器 ====================
+
+                function drawCatHead(ctx, x, y, size, color, expression, rotation = 0, catId = null) {
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.rotate(rotation);
+
+                    // 1. 脑袋
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, size, size * 0.82, 0, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // 2. 左耳
+                    ctx.beginPath();
+                    ctx.moveTo(-size * 0.7, -size * 0.3);
+                    ctx.lineTo(-size * 0.85, -size * 1.05);
+                    ctx.lineTo(-size * 0.2, -size * 0.75);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = '#FFC0CB';
+                    ctx.beginPath();
+                    ctx.moveTo(-size * 0.65, -size * 0.35);
+                    ctx.lineTo(-size * 0.78, -size * 0.9);
+                    ctx.lineTo(-size * 0.3, -size * 0.68);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 3. 右耳
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(size * 0.7, -size * 0.3);
+                    ctx.lineTo(size * 0.85, -size * 1.05);
+                    ctx.lineTo(size * 0.2, -size * 0.75);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.fillStyle = '#FFC0CB';
+                    ctx.beginPath();
+                    ctx.moveTo(size * 0.65, -size * 0.35);
+                    ctx.lineTo(size * 0.78, -size * 0.9);
+                    ctx.lineTo(size * 0.3, -size * 0.68);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    // 专属服饰配饰系统 (Quiet 猫带耳机，喵喵猫带蝴蝶结)
+                    if (catId === 'orange') {
+                        // Quiet 猫戴酷酷耳机 🎧
+                        ctx.strokeStyle = '#4F46E5';
+                        ctx.lineWidth = Math.max(2, size * 0.12);
+                        ctx.beginPath();
+                        ctx.arc(0, -size * 0.1, size * 0.88, Math.PI, 0); // 耳机梁
+                        ctx.stroke();
+
+                        // 左右耳罩
+                        ctx.fillStyle = '#6366F1';
+                        ctx.beginPath();
+                        ctx.ellipse(-size * 0.85, -size * 0.1, size * 0.15, size * 0.28, 0.2, 0, Math.PI * 2);
+                        ctx.ellipse(size * 0.85, -size * 0.1, size * 0.15, size * 0.28, -0.2, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else if (catId === 'white') {
+                        // 喵喵猫戴粉色可爱大蝴蝶结 🎀
+                        ctx.fillStyle = '#EC4899';
+                        const bowX = -size * 0.45;
+                        const bowY = -size * 0.85;
+                        ctx.beginPath();
+                        ctx.ellipse(bowX - size * 0.15, bowY, size * 0.18, size * 0.12, -0.3, 0, Math.PI * 2);
+                        ctx.ellipse(bowX + size * 0.15, bowY, size * 0.18, size * 0.12, 0.3, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#F472B6';
+                        ctx.beginPath();
+                        ctx.arc(bowX, bowY, size * 0.08, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    // 五官
+                    ctx.strokeStyle = '#8B4513';
+                    ctx.lineWidth = Math.max(1.5, size * 0.08);
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+
+                    // 4. 眼睛
+                    ctx.fillStyle = '#8B4513';
+                    const eyeOffset = size * 0.38;
+                    const eyeY = -size * 0.1;
+                    const eyeR = size * 0.11;
+
+                    if (expression === 'heart') {
+                        ctx.fillStyle = '#E11D48';
+                        drawHeartShape(ctx, -eyeOffset, eyeY - size * 0.05, size * 0.22);
+                        drawHeartShape(ctx, eyeOffset, eyeY - size * 0.05, size * 0.22);
+                    } else if (expression === 'blink' || (catsBlinking.value && Math.sin(Date.now() * 0.005 + x) > 0.85)) {
+                        ctx.beginPath();
+                        ctx.arc(-eyeOffset, eyeY, eyeR, 0, Math.PI, true);
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.arc(eyeOffset, eyeY, eyeR, 0, Math.PI, true);
+                        ctx.stroke();
+                    } else if (expression === 'wink') {
+                        ctx.beginPath();
+                        ctx.arc(-eyeOffset, eyeY, eyeR, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath();
+                        ctx.arc(-eyeOffset - size*0.03, eyeY - size*0.03, size*0.035, 0, Math.PI*2);
+                        ctx.fill();
+
+                        ctx.strokeStyle = '#8B4513';
+                        ctx.beginPath();
+                        ctx.arc(eyeOffset, eyeY, eyeR, 0, Math.PI, true);
+                        ctx.stroke();
+                    } else {
+                        ctx.beginPath();
+                        ctx.arc(-eyeOffset, eyeY, eyeR, 0, Math.PI * 2);
+                        ctx.arc(eyeOffset, eyeY, eyeR, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillStyle = '#FFFFFF';
+                        ctx.beginPath();
+                        ctx.arc(-eyeOffset - size*0.03, eyeY - size*0.03, size*0.035, 0, Math.PI*2);
+                        ctx.arc(eyeOffset - size*0.03, eyeY - size*0.03, size*0.035, 0, Math.PI*2);
+                        ctx.fill();
+                    }
+
+                    // 5. 腮红
+                    ctx.fillStyle = 'rgba(255, 105, 180, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(-size * 0.5, size * 0.15, size * 0.15, 0, Math.PI * 2);
+                    ctx.arc(size * 0.5, size * 0.15, size * 0.15, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // 6. 嘴和倒三角鼻
+                    ctx.strokeStyle = '#8B4513';
+                    ctx.fillStyle = '#FF69B4';
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(-size * 0.06, -size * 0.05);
+                    ctx.lineTo(size * 0.06, -size * 0.05);
+                    ctx.closePath();
+                    ctx.fill();
+
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.quadraticCurveTo(-size * 0.08, size * 0.12, -size * 0.14, size * 0.05);
+                    ctx.moveTo(0, 0);
+                    ctx.quadraticCurveTo(size * 0.08, size * 0.12, size * 0.14, size * 0.05);
+                    ctx.stroke();
+
+                    // 7. 胡须
+                    ctx.beginPath();
+                    ctx.moveTo(-size * 0.65, size * 0.1);  ctx.lineTo(-size * 1.05, size * 0.06);
+                    ctx.moveTo(-size * 0.65, size * 0.2);  ctx.lineTo(-size * 1.1, size * 0.22);
+                    ctx.moveTo(size * 0.65, size * 0.1);   ctx.lineTo(size * 1.05, size * 0.06);
+                    ctx.moveTo(size * 0.65, size * 0.2);   ctx.lineTo(size * 1.1, size * 0.22);
+                    ctx.stroke();
+
+                    ctx.restore();
                 }
 
-                // 升级告白卡文案
-                confessionCard.style.opacity = '1';
-                confessionCard.style.transform = 'translateY(0) scale(1)';
-                confessionTitle.textContent = "👑 终极心动见证 👑";
-                const customMsg1314 = msg1314Input.value.trim() || "我喜欢你，不是一时兴起。而是蓄谋已久的温柔 ✨";
-                typeWriter(customMsg1314, confessionText, 90);
-            }
-        }
+                // 统一落物、樱花、粒子等基础形状绘制
+                function drawPawShape(ctx, x, y, size, alpha = 1.0) {
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = activeTheme.value === 'purple' ? '#C084FC' : '#FFB6C1'; 
+                    ctx.beginPath();
+                    ctx.ellipse(x, y + size * 0.1, size * 0.72, size * 0.6, 0, 0, Math.PI * 2);
+                    ctx.fill();
 
-        // 重置进度按钮事件
-        const resetProgressBtn = document.getElementById('resetProgress');
-        resetProgressBtn.addEventListener('click', () => {
-            currentHeartsCount = 0;
-            confettiTriggered52 = false;
-            confettiTriggered1314 = false;
-            currentHeartsText.textContent = "0";
-            targetHeartsText.textContent = "52";
-            progressBar.style.width = "0%";
-            hintBubble.textContent = "点击屏幕唤醒爱心吧 ✨";
-            
-            // 渐隐告白卡
-            confessionCard.style.opacity = '0';
-            confessionCard.style.transform = 'translateY(-10px) scale(0.95)';
-            clearInterval(typeTimer);
-            confessionText.innerHTML = "";
-
-            playSound('tap');
-        });
-
-        // ==================== 屏幕事件监听 (手势机制) ====================
-
-        // 处理核心生成与反馈
-        function createHeartInteract(x, y, count = 1, isDouble = false) {
-            playSound('tap');
-            addHeartCount(count);
-
-            // 让主心瞬间缩放加速跳动
-            centerHeart.clickAccelerate = 0.08;
-
-            // 产生浮动爱心
-            for (let i = 0; i < count; i++) {
-                floatingHearts.push(new FloatingHeart(x, y, isDouble));
-            }
-
-            // 产生扩散光晕粒子
-            const particleColors = ['#FF85B3', '#FFD54F', '#81D4FA', '#B39DDB'];
-            const randColor = particleColors[Math.floor(Math.random() * particleColors.length)];
-            for (let i = 0; i < (isDouble ? 15 : 6); i++) {
-                particles.push(new Particle(x, y, randColor));
-            }
-        }
-
-        // 双击交互判断
-        let lastTap = 0;
-        function handleTapStart(clientX, clientY) {
-            const rect = canvas.getBoundingClientRect();
-            const posX = clientX - rect.left;
-            const posY = clientY - rect.top;
-
-            const now = Date.now();
-            if (now - lastTap < 300) {
-                // 1. 双击：爆发多颗爱心 + 金星粒子
-                createHeartInteract(posX, posY, 3, true);
-            } else {
-                // 2. 单击生成
-                createHeartInteract(posX, posY, 1, false);
-            }
-            lastTap = now;
-
-            // 3. 准备长按心动雨检测
-            isLongPressing = true;
-            clearTimeout(longPressTimer);
-            longPressTimer = setTimeout(() => {
-                triggerHeartRain(posX, posY);
-            }, 500);
-        }
-
-        // 长按产生心动雨效果
-        function triggerHeartRain(x, y) {
-            if (!isLongPressing) return;
-            
-            // 开启循环生成动画
-            const rainInterval = setInterval(() => {
-                if (!isLongPressing) {
-                    clearInterval(rainInterval);
-                    return;
+                    const toeRadius = size * 0.24;
+                    const toes = [{ dx: -size * 0.52, dy: -size * 0.42 }, { dx: -size * 0.18, dy: -size * 0.62 }, { dx: size * 0.18, dy: -size * 0.62 }, { dx: size * 0.52, dy: -size * 0.42 }];
+                    toes.forEach(toe => {
+                        ctx.beginPath();
+                        ctx.arc(x + toe.dx, y + toe.dy, toeRadius, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                    ctx.restore();
                 }
-                // 在手势位置周围发散
-                const offsetRange = 40;
-                const rx = x + (Math.random() - 0.5) * offsetRange;
-                const ry = y + (Math.random() - 0.5) * offsetRange;
-                createHeartInteract(rx, ry, 1, false);
-            }, 100);
-        }
 
-        // 鼠标事件监听
-        canvas.addEventListener('mousedown', (e) => {
-            handleTapStart(e.clientX, e.clientY);
-        });
+                // ==================== 粒子逻辑类 ====================
 
-        canvas.addEventListener('mousemove', (e) => {
-            if (isLongPressing) {
-                // 如果是长按拖动，动态调整心雨原点
-                const rect = canvas.getBoundingClientRect();
-                const posX = e.clientX - rect.left;
-                const posY = e.clientY - rect.top;
-                // 滑动留下彩星
-                trailParticles.push(new TrailParticle(posX, posY));
-            }
-        });
+                class FloatingCat {
+                    constructor(x, y, isSpecial = false, forceColor = null, forceId = null) {
+                        this.x = x;
+                        this.y = y;
+                        this.size = isSpecial ? Math.random() * 8 + 22 : Math.random() * 8 + 16;
+                        this.vx = (Math.random() - 0.5) * 1.6;
+                        this.vy = -(Math.random() * 1.4 + 1.2);
+                        this.alpha = 1;
+                        this.fadeSpeed = Math.random() * 0.007 + 0.005;
 
-        window.addEventListener('mouseup', () => {
-            isLongPressing = false;
-            clearTimeout(longPressTimer);
-        });
+                        // 决定生成的猫咪（Quiet 戴耳机，喵喵 戴蝴蝶结）
+                        if (forceId) {
+                            this.catId = forceId;
+                            this.color = forceColor;
+                        } else {
+                            this.catId = Math.random() > 0.5 ? 'orange' : 'white';
+                            const targetPreset = catDictionary.find(c => c.id === this.catId);
+                            this.color = targetPreset.color;
+                        }
 
-        // 移动端 Touch 触摸事件适配 (防多指冲突)
-        canvas.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            handleTapStart(touch.clientX, touch.clientY);
-        });
+                        const expressions = ['wink', 'default', 'default', 'blink'];
+                        this.expression = isSpecial ? 'heart' : expressions[Math.floor(Math.random() * expressions.length)];
+                        this.scale = 0.1;
+                        this.targetScale = 1.0;
+                        this.swingSpeed = Math.random() * 0.02 + 0.01;
+                        this.swingRange = Math.random() * 1.2 + 0.4;
+                        this.swingOffset = Math.random() * Math.PI * 2;
+                        this.rotation = (Math.random() - 0.5) * 0.2;
+                    }
 
-        canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            const touch = e.touches[0];
-            const rect = canvas.getBoundingClientRect();
-            const posX = touch.clientX - rect.left;
-            const posY = touch.clientY - rect.top;
-            
-            trailParticles.push(new TrailParticle(posX, posY));
-        });
+                    update() {
+                        this.x += this.vx + Math.sin(this.swingOffset) * this.swingRange;
+                        this.y += this.vy;
+                        this.swingOffset += this.swingSpeed;
+                        if (this.scale < this.targetScale) this.scale += 0.08;
+                        this.alpha -= this.fadeSpeed;
+                    }
 
-        canvas.addEventListener('touchend', () => {
-            isLongPressing = false;
-            clearTimeout(longPressTimer);
-        });
-
-        // ==================== 渲染与动效环循环 ====================
-
-        function drawBackground() {
-            // 清理并绘制暗夜星空层
-            ctx.fillStyle = '#0d0d1e';
-            ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-
-            // 绘制缓慢移动闪烁的背景星尘
-            backgroundStars.forEach(star => {
-                star.y -= star.speed;
-                if (star.y < -10) {
-                    star.y = canvas.clientHeight + 10;
-                    star.x = Math.random() * canvas.clientWidth;
+                    draw(ctx) {
+                        ctx.save();
+                        ctx.globalAlpha = this.alpha;
+                        drawCatHead(ctx, this.x, this.y, this.size * this.scale, this.color, this.expression, this.rotation, this.catId);
+                        ctx.restore();
+                    }
                 }
-                
-                // 闪烁模拟正弦
-                const opacity = star.alpha * (0.6 + Math.sin(Date.now() * 0.002 + star.x) * 0.4);
-                ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
-                ctx.beginPath();
-                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-                ctx.fill();
-            });
-        }
 
-        function animationLoop() {
-            const w = canvas.clientWidth;
-            const h = canvas.clientHeight;
+                // ==================== 统一手势处理器 ====================
 
-            // 1. 渲染背景
-            drawBackground();
+                const triggerInteract = (x, y, count = 1, isSpecial = false) => {
+                    const activePair = Math.random() > 0.5 ? 'orange' : 'white';
+                    const targetPreset = catDictionary.find(c => c.id === activePair);
+                    playSound('tap', targetPreset.voice);
+                    
+                    addHeartCount(count);
+                    centerCat.clickAccelerate = 0.09;
+                    updateCombo();
 
-            // 2. 更新及渲染中心心跳爱心
-            centerHeart.update();
-            centerHeart.draw(ctx, w, h);
+                    // 产生浮游小猫
+                    for (let i = 0; i < count; i++) {
+                        floatingCats.push(new FloatingCat(x, y, isSpecial));
+                    }
 
-            // 3. 渲染拖尾轨迹粒子
-            for (let i = trailParticles.length - 1; i >= 0; i--) {
-                const trail = trailParticles[i];
-                trail.update();
-                if (trail.alpha <= 0) {
-                    trailParticles.splice(i, 1);
-                } else {
-                    trail.draw(ctx);
+                    trailPaws.push(new TrailPaw(x, y));
+
+                    if (isSpecial) {
+                        activeMeowBubbles.push(new MeowBubble(x, y));
+                    }
+
+                    // 爆裂粒子
+                    const colors = ['#FFC0CB', '#FFB347', '#FF69B4', '#F3E8FF'];
+                    const bubbleColor = colors[Math.floor(Math.random() * colors.length)];
+                    const pType = showHeartBubbles.value ? (Math.random() > 0.45 ? 'heart' : 'bubble') : 'star';
+                    for (let i = 0; i < (isSpecial ? 15 : 6); i++) {
+                        particles.push(new SpecialParticle(x, y, pType, bubbleColor));
+                    }
+                };
+
+                const addHeartCount = (count = 1) => {
+                    currentHeartsCount.value += count;
+                    checkCatUnlocks();
+                    saveToLocal();
+                };
+
+                const checkMilestones = () => {
+                    const count = currentHeartsCount.value;
+                    // 52 喵呜告白时刻
+                    if (count >= 52 && !confettiTriggered52) {
+                        confettiTriggered52 = true;
+                        finaleDancing.value = true;
+                        initDancingCats(canvas.clientWidth, canvas.clientHeight);
+
+                        playSound('success');
+                        playSound('music');
+                        
+                        // 漫天小猫和金色爆发
+                        for (let i = 0; i < 90; i++) {
+                            particles.push(new SpecialParticle(canvas.clientWidth / 2, canvas.clientHeight / 2 - 50, 'star', '#FFB347'));
+                            particles.push(new SpecialParticle(canvas.clientWidth / 2, canvas.clientHeight / 2 - 50, 'bubble', '#FFB6C1'));
+                            particles.push(new SpecialParticle(canvas.clientWidth / 2, canvas.clientHeight / 2 - 50, 'heart', '#D63384'));
+                        }
+
+                        // 弹窗表白信件
+                        const card = document.getElementById('confessionCard');
+                        if (card) {
+                            card.style.opacity = '1';
+                            card.style.transform = 'translate(-50%, -50%) scale(1)';
+                            card.style.left = '50%';
+                            card.style.top = '50%';
+                        }
+                        
+                        typeWriter(msg52.value, document.getElementById('confessionText'), 100);
+                    }
+
+                    // 1314 终极心动彩蛋 (修复重点：已修正 selColor 致命未声明引用报错)
+                    if (count >= 1314 && !confettiTriggered1314) {
+                        confettiTriggered1314 = true;
+                        playSound('success');
+                        playSound('music');
+                        setTimeout(() => playSound('music'), 1400);
+
+                        for (let k = 0; k < 6; k++) {
+                            setTimeout(() => {
+                                const rx = Math.random() * canvas.clientWidth;
+                                const ry = Math.random() * (canvas.clientHeight * 0.6);
+                                const colors = ['#FFD1DC', '#FFE4E6', '#FFF0F2', '#E11D48', '#FFB347'];
+                                // 已修正：原先的 colors[Math.floor(Math.random() * selColor)] 导致异常，现修改为 colors.length
+                                const selColor = colors[Math.floor(Math.random() * colors.length)];
+                                for (let i = 0; i < 50; i++) {
+                                    particles.push(new SpecialParticle(rx, ry, 'heart', selColor));
+                                    particles.push(new SpecialParticle(rx, ry, 'bubble', '#FFFFFF'));
+                                }
+                            }, k * 350);
+                        }
+
+                        const card = document.getElementById('confessionCard');
+                        if (card) {
+                            card.style.opacity = '1';
+                            card.style.transform = 'translate(-50%, -50%) scale(1)';
+                        }
+                        typeWriter(msg1314.value, document.getElementById('confessionText'), 80);
+                    }
+                };
+
+                // ==================== 事件分流处理 ====================
+
+                const handleCanvasMouseDown = (e) => {
+                    handleInteractionStart(e.clientX, e.clientY);
+                };
+
+                const handleCanvasMouseMove = (e) => {
+                    if (isLongPressing) {
+                        const rect = canvas.getBoundingClientRect();
+                        const posX = e.clientX - rect.left;
+                        const posY = e.clientY - rect.top;
+                        trailPaws.push(new TrailPaw(posX, posY));
+                    }
+                };
+
+                const handleCanvasTouchStart = (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    handleInteractionStart(touch.clientX, touch.clientY);
+                };
+
+                const handleCanvasTouchMove = (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const rect = canvas.getBoundingClientRect();
+                    const posX = touch.clientX - rect.left;
+                    const posY = touch.clientY - rect.top;
+                    trailPaws.push(new TrailPaw(posX, posY));
+                };
+
+                const handleCanvasTouchEnd = () => {
+                    isLongPressing = false;
+                    clearTimeout(longPressTimer);
+                };
+
+                const handleInteractionStart = (clientX, clientY) => {
+                    const rect = canvas.getBoundingClientRect();
+                    const posX = clientX - rect.left;
+                    const posY = clientY - rect.top;
+
+                    const now = Date.now();
+                    if (now - lastTapTime < 280) {
+                        triggerInteract(posX, posY, 3, true);
+                    } else {
+                        triggerInteract(posX, posY, 1, false);
+                    }
+                    lastTapTime = now;
+
+                    isLongPressing = true;
+                    clearTimeout(longPressTimer);
+                    longPressTimer = setTimeout(() => {
+                        startMeowRain(posX, posY);
+                    }, 450);
+                };
+
+                const startMeowRain = (x, y) => {
+                    if (!isLongPressing) return;
+                    const rainInterval = setInterval(() => {
+                        if (!isLongPressing) {
+                            clearInterval(rainInterval);
+                            return;
+                        }
+                        const offset = 50;
+                        const rx = x + (Math.random() - 0.5) * offset;
+                        const ry = y + (Math.random() - 0.5) * offset;
+                        triggerInteract(rx, ry, 1, false);
+                    }, 90);
+                };
+
+                // ==================== 统一帧渲染循环 ====================
+
+                onMounted(() => {
+                    canvas = document.getElementById('loveCanvas');
+                    ctx = canvas.getContext('2d');
+                    resizeCanvas();
+                    parseUrlState(); // 1. 解析URL 2.解析Local
+                    initBgItems();
+
+                    // 加载背景粉红樱花
+                    for (let i = 0; i < 20; i++) {
+                        bgSakura.push({
+                            x: Math.random() * window.innerWidth,
+                            y: Math.random() * window.innerHeight,
+                            size: Math.random() * 8 + 5,
+                            rotation: Math.random() * Math.PI * 2,
+                            rotSpeed: (Math.random() - 0.5) * 0.02,
+                            wind: Math.random() * 0.2 + 0.1,
+                            speed: Math.random() * 0.4 + 0.3
+                        });
+                    }
+
+                    renderScene();
+                    nextTick(() => {
+                        lucide.createIcons();
+                    });
+                });
+
+                function resizeCanvas() {
+                    canvas.width = canvas.clientWidth * scale;
+                    canvas.height = canvas.clientHeight * scale;
+                    ctx.scale(scale, scale);
                 }
-            }
 
-            // 4. 渲染爆发星星特效粒子
-            for (let i = particles.length - 1; i >= 0; i--) {
-                const p = particles[i];
-                p.update();
-                if (p.alpha <= 0) {
-                    particles.splice(i, 1);
-                } else {
-                    p.draw(ctx);
+                function renderScene() {
+                    if (!canvas || !ctx) return;
+                    
+                    let bgStart = '#FFE4E6', bgEnd = '#FFF2F4';
+                    if (activeTheme.value === 'orange') {
+                        bgStart = '#FEF3C7'; bgEnd = '#FFFBEB';
+                    } else if (activeTheme.value === 'purple') {
+                        bgStart = '#F3E8FF'; bgEnd = '#FAF5FF';
+                    }
+                    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight);
+                    gradient.addColorStop(0, bgStart);
+                    gradient.addColorStop(1, bgEnd);
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+
+                    // 绘制飘流小道具
+                    bgItems.forEach(toy => {
+                        toy.rotation += toy.rotSpeed;
+                        toy.y += toy.speed;
+                        if (toy.y > canvas.clientHeight + 20) {
+                            toy.y = -20;
+                            toy.x = Math.random() * canvas.clientWidth;
+                        }
+                        if (toy.type === 'fish') {
+                            drawFish(ctx, toy.x, toy.y, toy.size, toy.opacity, toy.rotation);
+                        } else if (toy.type === 'yarn') {
+                            drawYarnBall(ctx, toy.x, toy.y, toy.size, toy.opacity, toy.rotation);
+                        } else {
+                            drawSakuraPetal(ctx, toy.x, toy.y, toy.size * 0.6, toy.rotation);
+                        }
+                    });
+
+                    // 背景花瓣
+                    bgSakura.forEach(petal => {
+                        petal.y += petal.speed;
+                        petal.x += petal.wind;
+                        petal.rotation += petal.rotSpeed;
+                        if (petal.y > canvas.clientHeight + 10) {
+                            petal.y = -10;
+                            petal.x = Math.random() * canvas.clientWidth;
+                        }
+                        drawSakuraPetal(ctx, petal.x, petal.y, petal.size, petal.rotation);
+                    });
+
+                    // 绘制中心喵咪
+                    centerCat.update();
+                    centerCat.draw(ctx, canvas.clientWidth, canvas.clientHeight);
+
+                    // 告白起舞
+                    if (finaleDancing.value) {
+                        const cx = canvas.clientWidth / 2;
+                        const cy = canvas.clientHeight / 2 + 15;
+                        danceCatsList.forEach(cat => {
+                            cat.angle += 0.01;
+                            cat.rot = Math.sin(Date.now() * 0.005 + cat.angle) * 0.15;
+                            const dx = cx + Math.cos(cat.angle) * cat.radius;
+                            const dy = cy + Math.sin(cat.angle) * cat.radius;
+                            drawCatHead(ctx, dx, dy, cat.size, cat.color, cat.exp, cat.rot, cat.id);
+                        });
+                    }
+
+                    // 爪印
+                    for (let i = trailPaws.length - 1; i >= 0; i--) {
+                        const trail = trailPaws[i];
+                        trail.update();
+                        if (trail.alpha <= 0) trailPaws.splice(i, 1);
+                        else trail.draw(ctx);
+                    }
+
+                    // 粒子
+                    for (let i = particles.length - 1; i >= 0; i--) {
+                        const p = particles[i];
+                        p.update();
+                        if (p.alpha <= 0) particles.splice(i, 1);
+                        else p.draw(ctx);
+                    }
+
+                    // 浮动小猫
+                    for (let i = floatingCats.length - 1; i >= 0; i--) {
+                        const cat = floatingCats[i];
+                        cat.update();
+                        if (cat.alpha <= 0 || cat.y < -40) floatingCats.splice(i, 1);
+                        else cat.draw(ctx);
+                    }
+
+                    // 喵呜气泡
+                    for (let i = activeMeowBubbles.length - 1; i >= 0; i--) {
+                        const b = activeMeowBubbles[i];
+                        b.update();
+                        if (b.alpha <= 0) activeMeowBubbles.splice(i, 1);
+                        else b.draw(ctx);
+                    }
+
+                    requestAnimationFrame(renderScene);
                 }
-            }
 
-            // 5. 渲染浮动上升的爱心
-            for (let i = floatingHearts.length - 1; i >= 0; i--) {
-                const heart = floatingHearts[i];
-                heart.update();
-                if (heart.alpha <= 0 || heart.y < -20) {
-                    floatingHearts.splice(i, 1);
-                } else {
-                    heart.draw(ctx);
+                // ==================== 粒子类与工具实现 ====================
+                class TrailPaw {
+                    constructor(x, y) {
+                        this.x = x;
+                        this.y = y;
+                        this.size = Math.random() * 6 + 12;
+                        this.alpha = 0.9;
+                    }
+                    update() { this.alpha -= 0.025; this.size *= 0.97; }
+                    draw(ctx) { drawPawShape(ctx, this.x, this.y, this.size, this.alpha); }
                 }
+
+                class SpecialParticle {
+                    constructor(x, y, type = 'star', color = '#FFE082') {
+                        this.x = x; this.y = y;
+                        const angle = Math.random() * Math.PI * 2;
+                        const speed = Math.random() * 3.5 + 1.5;
+                        this.vx = Math.cos(angle) * speed;
+                        this.vy = Math.sin(angle) * speed;
+                        this.size = Math.random() * 4 + 2;
+                        this.alpha = 1;
+                        this.fadeSpeed = Math.random() * 0.02 + 0.012;
+                        this.color = color; this.type = type; this.gravity = 0.03;
+                    }
+                    update() { this.x += this.vx; this.vy += this.gravity; this.y += this.vy; this.alpha -= this.fadeSpeed; }
+                    draw(ctx) {
+                        ctx.save(); ctx.globalAlpha = this.alpha; ctx.fillStyle = this.color;
+                        ctx.shadowBlur = 4; ctx.shadowColor = this.color;
+                        if (this.type === 'bubble') {
+                            ctx.strokeStyle = this.color; ctx.lineWidth = 1;
+                            ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.stroke();
+                            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)'; ctx.beginPath();
+                            ctx.arc(this.x - this.size * 0.3, this.y - this.size * 0.3, this.size * 0.25, 0, Math.PI * 2); ctx.fill();
+                        } else if (this.type === 'heart') {
+                            drawHeartShape(ctx, this.x, this.y, this.size);
+                        } else {
+                            ctx.beginPath(); ctx.arc(this.x, this.y, this.size * 0.7, 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.restore();
+                    }
+                }
+
+                class MeowBubble {
+                    constructor(x, y) {
+                        this.x = x + (Math.random() - 0.5) * 30; this.y = y - 20; this.vy = -1.0; this.alpha = 1.0;
+                        const meows = ['喵呜~', 'Quiet 🐾', '喵喵 🎀', '贴贴~', '永远在一起'];
+                        this.text = meows[Math.floor(Math.random() * meows.length)];
+                        this.scale = 0.8;
+                    }
+                    update() { this.y += this.vy; this.alpha -= 0.015; if (this.scale < 1.0) this.scale += 0.02; }
+                    draw(ctx) {
+                        ctx.save(); ctx.globalAlpha = this.alpha; ctx.translate(this.x, this.y); ctx.scale(this.scale, this.scale);
+                        ctx.fillStyle = '#FFFFFF'; ctx.strokeStyle = '#FFB6C1'; ctx.lineWidth = 1.5;
+                        ctx.beginPath(); ctx.roundRect(-30, -12, 60, 20, 8); ctx.fill(); ctx.stroke();
+                        ctx.beginPath(); ctx.moveTo(-5, 8); ctx.lineTo(0, 13); ctx.lineTo(5, 8); ctx.closePath(); ctx.fill(); ctx.stroke();
+                        ctx.fillStyle = '#D63384'; ctx.font = 'bold 9px -apple-system'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                        ctx.fillText(this.text, 0, -2); ctx.restore();
+                    }
+                }
+
+                function drawFish(ctx, x, y, size, opacity, rotation) {
+                    ctx.save(); ctx.globalAlpha = opacity; ctx.translate(x, y); ctx.rotate(rotation);
+                    ctx.fillStyle = '#E2E8F0'; ctx.strokeStyle = '#CBD5E1'; ctx.lineWidth = 1.5;
+                    ctx.beginPath(); ctx.ellipse(0, 0, size * 0.8, size * 0.4, 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(-size * 0.7, 0); ctx.lineTo(-size * 1.1, -size * 0.3); ctx.lineTo(-size * 1.1, size * 0.3); ctx.closePath();
+                    ctx.fillStyle = '#CBD5E1'; ctx.fill(); ctx.stroke();
+                    ctx.fillStyle = '#64748B'; ctx.beginPath(); ctx.arc(size * 0.4, -size * 0.1, size * 0.08, 0, Math.PI * 2); ctx.fill();
+                    ctx.restore();
+                }
+
+                function drawYarnBall(ctx, x, y, size, opacity, rotation) {
+                    ctx.save(); ctx.globalAlpha = opacity; ctx.translate(x, y); ctx.rotate(rotation);
+                    ctx.strokeStyle = '#F472B6'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(0, 0, size * 0.7, 0, Math.PI * 2); ctx.stroke();
+                    for (let i = 0; i < 5; i++) {
+                        ctx.beginPath(); ctx.ellipse(0, 0, size * 0.65, size * (0.2 + i * 0.1), i * 0.4, 0, Math.PI * 2); ctx.stroke();
+                    }
+                    ctx.beginPath(); ctx.bezierCurveTo(size * 0.5, size * 0.5, size * 0.9, size * 1.1, size * 1.3, size * 0.8); ctx.stroke();
+                    ctx.restore();
+                }
+
+                const centerCat = {
+                    baseSize: 66, size: 66, scalePhase: 0, pulseSpeed: 0.03, clickAccelerate: 0, x: 0, y: 0, rotation: 0,
+                    update() {
+                        this.scalePhase += this.pulseSpeed + this.clickAccelerate;
+                        if (this.clickAccelerate > 0) this.clickAccelerate *= 0.94;
+                        const wave = Math.sin(this.scalePhase) * 0.10;
+                        const doubleBeat = Math.sin(this.scalePhase * 2.2) * 0.03;
+                        this.size = this.baseSize * (1 + wave + Math.max(0, doubleBeat));
+                        this.rotation = Math.sin(this.scalePhase * 0.5) * 0.05; 
+                    },
+                    draw(ctx, width, height) {
+                        this.x = width / 2; this.y = height / 2 + 15;
+                        ctx.save(); ctx.globalAlpha = 0.18 + Math.sin(this.scalePhase) * 0.06;
+                        ctx.fillStyle = '#FFB6C1'; ctx.shadowBlur = 32; ctx.shadowColor = '#FF69B4';
+                        ctx.beginPath(); ctx.arc(this.x, this.y, this.size * 1.25, 0, Math.PI * 2); ctx.fill();
+                        ctx.globalAlpha = 1.0;
+                        drawCatHead(ctx, this.x, this.y, this.size, '#FFFFFF', finaleDancing.value ? 'heart' : 'wink', this.rotation, 'white');
+                        ctx.restore();
+                    }
+                };
+
+                const danceCatsList = [];
+                function initDancingCats(w, h) {
+                    danceCatsList.length = 0;
+                    danceCatsList.push({ angle: 0, radius: 110, size: 18, color: '#B8C5D6', rot: 0, exp: 'wink', id: 'orange' }); // Quiet 猫
+                    danceCatsList.push({ angle: (Math.PI * 2 / 5), radius: 110, size: 18, color: '#FFFFFF', rot: 0, exp: 'heart', id: 'white' }); // 喵喵 猫
+                    
+                    const colors = ['#FFE5B4', '#FFCAD4', '#4A4A4A'];
+                    for (let i = 2; i < 5; i++) {
+                        danceCatsList.push({
+                            angle: (Math.PI * 2 / 5) * i,
+                            radius: 110,
+                            size: 18,
+                            color: colors[i % colors.length],
+                            rot: 0,
+                            exp: 'default',
+                            id: null
+                        });
+                    }
+                }
+
+                // 打字机告白文案展现器
+                function typeWriter(text, element, speed = 80) {
+                    element.innerHTML = "";
+                    let i = 0;
+                    clearInterval(typeTimer);
+                    element.classList.add('cursor-blink');
+                    
+                    typeTimer = setInterval(() => {
+                        if (i < text.length) {
+                            element.innerHTML += text.charAt(i);
+                            i++;
+                        } else {
+                            clearInterval(typeTimer);
+                            setTimeout(() => {
+                                element.classList.remove('cursor-blink');
+                            }, 1000);
+                        }
+                    }, speed);
+                }
+
+                const activeMeowBubbles = []; 
+                let lastTapTime = 0;
+
+                return {
+                    activeTab, activeTheme, activeRain, musicTrack, sender, receiver, msg52, msg1314, currentHeartsCount, targetHeartsMilestone, hintMessage, combo, unlockedCats, catDictionary, diaryList, progressWidth, audioEnabled,
+                    toggleAudio, changeTheme, changeRainItem, interactWithUnlockedCat, resetProgress, saveToLocal, generateShareLink, handleCanvasMouseDown, handleCanvasMouseMove, handleCanvasTouchStart, handleCanvasTouchMove, handleCanvasTouchEnd
+                };
             }
-
-            // 保持在 60FPS 满血流畅渲染
-            requestAnimationFrame(animationLoop);
-        }
-
-        // 启动动力学浪漫渲染管线
-        animationLoop();
-
+        }).mount('#app');
     </script>
 </body>
 </html>
